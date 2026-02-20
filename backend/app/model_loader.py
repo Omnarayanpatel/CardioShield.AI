@@ -1,10 +1,12 @@
-# Load trained model
-import os
 import joblib
+import os
 
 def load_model():
-    current_dir = os.path.dirname(__file__)
-    project_root = os.path.abspath(os.path.join(current_dir, "../../"))
-    model_path = os.path.join(project_root, "model_training", "saved_model.pkl")
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    model_path = os.path.join(base_dir, "model_training", "saved", "cardio_model.pkl")
+    scaler_path = os.path.join(base_dir, "model_training", "saved", "scaler.pkl")
 
-    return joblib.load(model_path)
+    model = joblib.load(model_path)
+    scaler = joblib.load(scaler_path)
+
+    return model, scaler

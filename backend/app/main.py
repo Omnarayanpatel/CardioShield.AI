@@ -1,42 +1,50 @@
 from fastapi import FastAPI
 import numpy as np
-from .model_loader import load_model
-
 from .schemas import PatientData
-
+from .model_loader import load_model
 
 app = FastAPI()
 
-model = load_model()
+model, scaler = load_model()
 
 @app.post("/predict")
 def predict(data: PatientData):
-    input_data = np.array([[ 
-        data.age,
-        data.sex,
-        data.cp,
-        data.trestbps,
-        data.chol,
-        data.fbs,
-        data.restecg,
-        data.thalach,
-        data.exang,
-        data.oldpeak,
-        data.slope,
-        data.ca,
-        data.thal
+
+    age_years = data.age / 365
+
+    bmi = data.weight / ((data.height / 100) ** 2)
+    pulse_pressure = data.ap_hi - data.ap_lo
+    age_bp_interaction = age_years * data.ap_hi
+    glucose_bmi_interaction = data.gluc * bmi
+
+    input_data = np.array([[
+        age_years,
+        data.gender,
+        data.height,
+        data.weight,
+        data.ap_hi,
+        data.ap_lo,
+        data.cholesterol,
+        data.gluc,
+        data.smoke,
+        data.alco,
+        data.active,
+        bmi,
+        pulse_pressure,
+        age_bp_interaction,
+        glucose_bmi_interaction
     ]])
 
     probability = model.predict_proba(input_data)[0][1]
 
     if probability < 0.3:
-        risk = "Low Risk"
+        category = "Low Risk"
     elif probability < 0.7:
-        risk = "Moderate Risk"
+        category = "Moderate Risk"
     else:
-        risk = "High Risk"
+        category = "High Risk"
 
     return {
         "risk_probability": float(probability),
-        "risk_category": risk
+        "risk_category": category
     }
