@@ -1,17 +1,32 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 import numpy as np
+from sqlalchemy.orm import Session
+
 from .schemas import PatientData
 from .model_loader import load_model
+from .database import SessionLocal, engine
+from . import models
 
 app = FastAPI()
 
+# Create DB tables
+models.Base.metadata.create_all(bind=engine)
+
 model, scaler = load_model()
 
+# DB Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 @app.post("/predict")
-def predict(data: PatientData):
+def predict(data: PatientData, db: Session = Depends(get_db)):
 
+    # Feature Engineering
     age_years = data.age / 365
-
     bmi = data.weight / ((data.height / 100) ** 2)
     pulse_pressure = data.ap_hi - data.ap_lo
     age_bp_interaction = age_years * data.ap_hi
@@ -38,11 +53,32 @@ def predict(data: PatientData):
     probability = model.predict_proba(input_data)[0][1]
 
     if probability < 0.3:
-        category = "Low Risk"
+        category = 0
     elif probability < 0.7:
-        category = "Moderate Risk"
+        category = 1
     else:
-        category = "High Risk"
+        category = 2
+
+    # Save to DB
+    db_record = models.Prediction(
+        age=data.age,
+        gender=data.gender,
+        height=data.height,
+        weight=data.weight,
+        ap_hi=data.ap_hi,
+        ap_lo=data.ap_lo,
+        cholesterol=data.cholesterol,
+        gluc=data.gluc,
+        smoke=data.smoke,
+        alco=data.alco,
+        active=data.active,
+        risk_probability=float(probability),
+        risk_category=category
+    )
+
+    db.add(db_record)
+    db.commit()
+    db.refresh(db_record)
 
     return {
         "risk_probability": float(probability),
