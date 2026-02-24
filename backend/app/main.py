@@ -30,6 +30,12 @@ def get_db():
         yield db
     finally:
         db.close()
+@app.get("/predictions")
+def get_predictions(db: Session = Depends(get_db)):
+    records = db.query(models.Prediction).all()
+    return records
+
+
 
 @app.post("/predict")
 def predict(data: PatientData, db: Session = Depends(get_db)):
