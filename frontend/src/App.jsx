@@ -3,20 +3,22 @@ import MainLayout from "./layouts/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Prediction from "./pages/Prediction";
 import History from "./pages/History";
-
+import Register from "./pages/Register";
 function App() {
   return (
     
     <Routes>
-       {/* Layout Route */}
-        <Route path="/" element={<MainLayout />}>
+      
+      {/* Register page outside layout */}
+      <Route path="/register" element={<Register />} />
 
-          {/* Nested Pages */}
-          <Route index element={<Dashboard />} />
-          <Route path="prediction" element={<Prediction />} />
-          <Route path="history" element={<History />} />
+             {/* All main pages inside layout */}
+      <Route path="/" element={<MainLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="prediction" element={<Prediction />} />
+        <Route path="history" element={<History />} />
+      </Route>
 
-        </Route>
     </Routes>
     
   );
