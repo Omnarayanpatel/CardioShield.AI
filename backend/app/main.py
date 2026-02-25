@@ -1,28 +1,36 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends,HTTPException
 import numpy as np
 from sqlalchemy.orm import Session
 
 from .schemas import PatientData
+from .schemas import PatientCreate  # new added
 from .model_loader import load_model
 from .database import SessionLocal, engine
 from . import models
 from fastapi.middleware.cors import CORSMiddleware
+from passlib.context import CryptContext
 
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # frontend url
+    allow_origins=["*"],  # frontend url
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
 
 model, scaler = load_model()
+
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto"
+)
 
 # DB Dependency
 def get_db():
@@ -98,6 +106,29 @@ def predict(data: PatientData, db: Session = Depends(get_db)):
         "risk_category": category
     }
 
+@app.post("/register")
+def register(data: PatientCreate, db: Session = Depends(get_db)):
+    
+    # Check if user exists
+    existing_user = db.query(models.Patient).filter(models.Patient.email == data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Hash password
+    hashed_password = pwd_context.hash(data.password[:72])
+
+    # Create user
+    new_user = models.Patient(
+        name=data.name,
+        email=data.email,
+        password=hashed_password
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"message": "Registration successful"}
 @app.get("/history")
 def get_history(db: Session = Depends(get_db)):
     records = db.query(models.Prediction).all()

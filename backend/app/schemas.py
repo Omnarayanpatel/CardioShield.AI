@@ -1,5 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel , EmailStr
 
+class PatientCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+    
 class PatientData(BaseModel):
     age: float
     gender: int
@@ -12,3 +17,4 @@ class PatientData(BaseModel):
     smoke: int
     alco: int
     active: int
+    cardio:int
