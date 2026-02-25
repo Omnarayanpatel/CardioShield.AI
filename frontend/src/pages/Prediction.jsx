@@ -15,7 +15,9 @@ function Prediction() {
     alco: "",
     active: "",
   });
+
   const [result, setResult] = useState(null);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -27,14 +29,27 @@ function Prediction() {
     e.preventDefault();
 
     try {
+      // ✅ Convert all values to numbers before sending
       const response = await axios.post(
         "http://127.0.0.1:8000/predict",
-        formData,
+        {
+          age: Number(formData.age),
+          gender: Number(formData.gender),
+          height: Number(formData.height),
+          weight: Number(formData.weight),
+          ap_hi: Number(formData.ap_hi),
+          ap_lo: Number(formData.ap_lo),
+          cholesterol: Number(formData.cholesterol),
+          gluc: Number(formData.gluc),
+          smoke: Number(formData.smoke),
+          alco: Number(formData.alco),
+          active: Number(formData.active),
+        }
       );
+
       setResult(response.data);
-        console.log(response.data);
-      //   alert(`Risk Category: ${response.data.risk_category}
-      //          Risk Probability: ${response.data.risk_probability}`);
+      console.log(response.data);
+
     } catch (error) {
       console.error(error);
       alert("Error connecting to backend");
@@ -47,36 +62,12 @@ function Prediction() {
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 gap-6">
-          <input
-            name="age"
-            placeholder="Age"
-            onChange={handleChange}
-            className="input"
-          />
-          <input
-            name="height"
-            placeholder="Height (cm)"
-            onChange={handleChange}
-            className="input"
-          />
-          <input
-            name="weight"
-            placeholder="Weight (kg)"
-            onChange={handleChange}
-            className="input"
-          />
-          <input
-            name="ap_hi"
-            placeholder="Systolic BP"
-            onChange={handleChange}
-            className="input"
-          />
-          <input
-            name="ap_lo"
-            placeholder="Diastolic BP"
-            onChange={handleChange}
-            className="input"
-          />
+
+          <input name="age" placeholder="Age (in days)" onChange={handleChange} className="input" />
+          <input name="height" placeholder="Height (cm)" onChange={handleChange} className="input" />
+          <input name="weight" placeholder="Weight (kg)" onChange={handleChange} className="input" />
+          <input name="ap_hi" placeholder="Systolic BP" onChange={handleChange} className="input" />
+          <input name="ap_lo" placeholder="Diastolic BP" onChange={handleChange} className="input" />
 
           <select name="gender" onChange={handleChange} className="input">
             <option value="">Select Gender</option>
@@ -124,29 +115,45 @@ function Prediction() {
           </button>
         </div>
 
-        {/* ✅ Result Section (outside grid but inside form) */}
-        {result && (
-          <div
-            className="mt-6 p-6 rounded-xl shadow-md 
-      bg-gradient-to-r from-green-100 to-green-200"
-          >
-            <h2 className="text-xl font-bold mb-2">Prediction Result</h2>
+     {result && (
+  <div
+    className={`mt-8 p-8 rounded-2xl shadow-xl text-white transition-all duration-500
+    ${
+      result.risk_category === "Low"
+        ? "bg-gradient-to-r from-green-500 to-emerald-600"
+        : result.risk_category === "Moderate"
+        ? "bg-gradient-to-r from-yellow-500 to-orange-500"
+        : "bg-gradient-to-r from-red-500 to-rose-600"
+    }`}
+  >
+    <h2 className="text-2xl font-bold mb-4">Prediction Result</h2>
 
-            <p>
-              Risk Category:
-              <span className="font-semibold ml-2">
-                {result.risk_category === 1 ? "High Risk" : "Low Risk"}
-              </span>
-            </p>
+    <div className="space-y-3 text-lg">
+      <p>
+        Risk Category:
+        <span className="ml-2 font-semibold">
+          {result.risk_category}
+        </span>
+      </p>
 
-            <p>
-              Risk Probability:
-              <span className="font-semibold ml-2">
-                {(result.risk_probability * 100).toFixed(2)}%
-              </span>
-            </p>
-          </div>
-        )}
+      <p>
+        Risk Probability:
+        <span className="ml-2 font-semibold">
+          {(result.risk_probability * 100).toFixed(2)}%
+        </span>
+      </p>
+
+      <p>
+        Cardio Status:
+        <span className="ml-2 font-semibold">
+          {result.cardio === 1
+            ? "⚠ Disease Detected"
+            : "✅ No Disease"}
+        </span>
+      </p>
+    </div>
+  </div>
+)}
       </form>
     </div>
   );

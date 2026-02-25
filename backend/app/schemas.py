@@ -17,4 +17,4 @@ class PatientData(BaseModel):
     smoke: int
     alco: int
     active: int
-    cardio:int
+    

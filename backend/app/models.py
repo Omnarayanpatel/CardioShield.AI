@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, Float, DateTime, String
 from sqlalchemy.sql import func
 from .database import Base
 
+user_email = Column(String, nullable=False)
 class Patient(Base):
     __tablename__ = "patients"
 

@@ -1,47 +1,92 @@
- CardioShield AI – Heart Attack Risk Prediction System
+# CardioShield AI
+AI-Powered Cardiovascular Risk Prediction System
 
-Overview
-CardioShield AI is a machine learning–based web application that predicts heart attack risk based on patient clinical data.
+---
 
-The system uses trained ML models (Logistic Regression, Random Forest, XGBoost) and selects the best performing model for prediction.
+##  Overview
 
--> Features
-Heart attack risk prediction
+CardioShield AI is a machine learning-based cardiovascular risk prediction system designed to provide accurate, explainable, and fair risk assessments.
 
-Probability-based risk classification
+The system integrates:
+- Advanced ML models
+- Fairness auditing
+- Bias mitigation
+- Explainable AI (SHAP)
+- FastAPI backend
+- PostgreSQL database logging
 
-REST API using FastAPI
+---
 
-Modular architecture
+##  Features
 
-Docker-ready structure
+- Cardiovascular risk prediction API
+- Feature engineering (BMI, Pulse Pressure, Interaction Features)
+- Multi-model comparison (Random Forest, XGBoost, LightGBM, Neural Network)
+- ROC-AUC based model selection
+- Probability calibration (Isotonic Regression)
+- SHAP explainability
+- Gender & Age fairness audit
+- Threshold-based bias mitigation
+- Prediction history logging
+- REST API integration
 
- -> ML Models Used
-Logistic Regression
+---
 
-Random Forest
+## System Architecture
 
-XGBoost (Best performing model)
+Frontend (React/Vite)
+⬇
+FastAPI Backend
+⬇
+Calibrated ML Model
+⬇
+PostgreSQL Database
 
--> Risk Categories
-Low Risk (< 30%)
+---
 
-Moderate Risk (30% – 70%)
+##  ML Pipeline
 
-High Risk (> 70%)
+### Feature Engineering
+- BMI
+- Pulse Pressure
+- Age × BP Interaction
+- Glucose × BMI Interaction
 
--> Tech Stack
-Python
+### Model Evaluation
+- ROC-AUC scoring
+- Best model auto-selection
+- Calibration applied
 
-FastAPI
+### Ethical AI
+- Gender fairness evaluation
+- Age group fairness evaluation
+- Disparate impact ratio calculation
+- Threshold-based mitigation applied
 
-Scikit-learn
+---
 
-XGBoost
+##  Tech Stack
 
-PostgreSQL (planned)
+Backend:
+- FastAPI
+- SQLAlchemy
+- PostgreSQL
+- Scikit-learn
+- XGBoost
+- LightGBM
+- SHAP
 
-React (planned)
+Frontend:
+- React + Vite
+- Axios
 
-# NavKalpana-RICR-NK-0089
-CardioShield AI: An explainable AI-based cardiovascular risk prediction system built for NavKalpana Hackathon 2026.
+---
+
+##  Setup Instructions
+
+### Backend
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload

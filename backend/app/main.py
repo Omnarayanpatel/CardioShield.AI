@@ -1,28 +1,30 @@
-from fastapi import FastAPI, Depends,HTTPException
-import numpy as np
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-
-from .schemas import PatientData
-from .schemas import PatientCreate  # new added
-from .model_loader import load_model
-from .database import SessionLocal, engine
-from . import models
 from fastapi.middleware.cors import CORSMiddleware
 from passlib.context import CryptContext
+import numpy as np
 
+from .database import SessionLocal, engine
+from .schemas import PatientData, PatientCreate
+from .model_loader import load_model
+from .auth import router as auth_router, get_current_user
+from . import models
+
+# ==============================
+# App Setup
+# ==============================
 
 app = FastAPI()
+app.include_router(auth_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # frontend url
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# Create DB tables
 models.Base.metadata.create_all(bind=engine)
 
 model, scaler = load_model()
@@ -32,38 +34,64 @@ pwd_context = CryptContext(
     deprecated="auto"
 )
 
+# ==============================
 # DB Dependency
+# ==============================
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-@app.get("/predictions")
-def get_predictions(db: Session = Depends(get_db)):
-    records = db.query(models.Prediction).all()
-    return records
 
+# ==============================
+# REGISTER
+# ==============================
 
+@app.post("/register")
+def register(data: PatientCreate, db: Session = Depends(get_db)):
+
+    existing_user = db.query(models.Patient)\
+        .filter(models.Patient.email == data.email)\
+        .first()
+
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    hashed_password = pwd_context.hash(data.password[:72])
+
+    new_user = models.Patient(
+        name=data.name,
+        email=data.email,
+        password=hashed_password
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"message": "Registration successful"}
+
+# ==============================
+# PREDICT (Protected)
+# ==============================
 
 @app.post("/predict")
-def predict(data: PatientData, db: Session = Depends(get_db)):
+def predict(
+    data: PatientData,
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
 
-<<<<<<< Satakshi
-
-=======
-    # ==============================
->>>>>>> main
     # Feature Engineering
-    # ==============================
-
     age_years = data.age / 365
     bmi = data.weight / ((data.height / 100) ** 2)
     pulse_pressure = data.ap_hi - data.ap_lo
     age_bp_interaction = age_years * data.ap_hi
     glucose_bmi_interaction = data.gluc * bmi
 
-    input_data = np.array([[ 
+    input_data = np.array([[
         age_years,
         data.gender,
         data.height,
@@ -81,26 +109,10 @@ def predict(data: PatientData, db: Session = Depends(get_db)):
         glucose_bmi_interaction
     ]])
 
-    # ==============================
-    # Get Probability
-    # ==============================
-
     probability = model.predict_proba(input_data)[0][1]
 
-    # ==============================
-    # AGE-BASED THRESHOLD MITIGATION
-    # ==============================
-
-    if age_years < 50:
-        threshold = 0.40
-    else:
-        threshold = 0.50
-
+    threshold = 0.40 if age_years < 50 else 0.50
     predicted_label = 1 if probability >= threshold else 0
-
-    # ==============================
-    # Risk Category Mapping
-    # ==============================
 
     if probability < 0.30:
         category_label = "Low"
@@ -112,21 +124,14 @@ def predict(data: PatientData, db: Session = Depends(get_db)):
         category_label = "High"
         category_code = 2
 
-    # ==============================
-    # Ethical Escalation Logic
-    # ==============================
-
     if probability >= 0.70:
-        recommendation = "High cardiovascular risk detected. Immediate consultation with a cardiologist is strongly recommended."
+        recommendation = "High cardiovascular risk detected. Immediate consultation recommended."
     elif probability >= 0.40:
-        recommendation = "Moderate cardiovascular risk. Lifestyle modification and periodic medical evaluation advised."
+        recommendation = "Moderate cardiovascular risk. Lifestyle modification advised."
     else:
-        recommendation = "Low cardiovascular risk. Maintain a healthy lifestyle and regular check-ups."
+        recommendation = "Low cardiovascular risk. Maintain healthy habits."
 
-    # ==============================
-    # Save to DB (Audit Logging)
-    # ==============================
-
+    # Save to DB (linked to logged user)
     db_record = models.Prediction(
         age=data.age,
         gender=data.gender,
@@ -140,53 +145,33 @@ def predict(data: PatientData, db: Session = Depends(get_db)):
         alco=data.alco,
         active=data.active,
         risk_probability=float(probability),
-        risk_category=category_code
+        risk_category=category_code,
+        user_email=current_user
     )
 
     db.add(db_record)
     db.commit()
     db.refresh(db_record)
 
-    # ==============================
-    # Final Response (Ethical Layer)
-    # ==============================
-
     return {
         "risk_probability": float(probability),
-<<<<<<< Satakshi
-        "risk_category": category
-    }
-
-@app.post("/register")
-def register(data: PatientCreate, db: Session = Depends(get_db)):
-    
-    # Check if user exists
-    existing_user = db.query(models.Patient).filter(models.Patient.email == data.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # Hash password
-    hashed_password = pwd_context.hash(data.password[:72])
-
-    # Create user
-    new_user = models.Patient(
-        name=data.name,
-        email=data.email,
-        password=hashed_password
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return {"message": "Registration successful"}
-@app.get("/history")
-def get_history(db: Session = Depends(get_db)):
-    records = db.query(models.Prediction).all()
-    return records
-=======
         "risk_category": category_label,
-        "recommendation": recommendation,
-        "disclaimer": "This is a cardiovascular risk estimation tool and not a medical diagnosis. Clinical decisions should be made by a licensed healthcare professional."
+        "cardio": predicted_label,
+        "recommendation": recommendation
     }
->>>>>>> main
+
+# ==============================
+# HISTORY (Per User)
+# ==============================
+
+@app.get("/history")
+def get_history(
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    records = db.query(models.Prediction)\
+        .filter(models.Prediction.user_email == current_user)\
+        .all()
+
+    return records
