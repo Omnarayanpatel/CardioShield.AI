@@ -12,11 +12,12 @@ function Sidebar() {
           Dashboard
         </Link>
         <Link to="/prediction" className="hover:text-blue-400 transition">
-          New Prediction
+           Prediction
         </Link>
         <Link to="/history" className="hover:text-blue-400 transition">
           History
         </Link>
+        <Link to="/admin">Admin</Link>
       </nav>
     </div>
   );

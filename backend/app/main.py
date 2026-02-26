@@ -7,7 +7,7 @@ import numpy as np
 from .database import SessionLocal, engine
 from .schemas import PatientData, PatientCreate
 from .model_loader import load_model
-from .auth import router as auth_router, get_current_user
+from .auth import router as auth_router, get_current_user, get_current_admin
 from . import models
 
 # ==============================
@@ -159,7 +159,20 @@ def predict(
         "cardio": predicted_label,
         "recommendation": recommendation
     }
+@app.get("/admin/users")
+def get_all_users(
+    admin: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    return db.query(models.Patient).all()
 
+
+@app.get("/admin/predictions")
+def get_all_predictions(
+    admin: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    return db.query(models.Prediction).all()
 # ==============================
 # HISTORY (Per User)
 # ==============================

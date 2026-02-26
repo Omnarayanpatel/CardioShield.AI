@@ -8,6 +8,7 @@ from . import models
 from .schemas import PatientCreate
 from .utils import create_access_token
 from fastapi.security import OAuth2PasswordRequestForm
+
 router = APIRouter()
 
 pwd_context = CryptContext(
@@ -43,11 +44,19 @@ def login(
     access_token = create_access_token(
         data={"sub": user.email}
     )
+    access_token = create_access_token(
+    data={
+        "sub": user.email,
+        "role": user.role
+    }
+)
 
     return {
         "access_token": access_token,
         "token_type": "bearer"
     }
+
+    
 
     user = db.query(models.Patient).filter(models.Patient.email == data.email).first()
 
@@ -65,3 +74,10 @@ def login(
         "access_token": access_token,
         "token_type": "bearer"
     }
+def get_current_admin(token: str = Depends(oauth2_scheme)):
+    payload = verify_token(token)
+
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return payload

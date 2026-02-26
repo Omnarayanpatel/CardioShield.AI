@@ -1,49 +1,38 @@
-import {Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
+
 import MainLayout from "./layouts/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Prediction from "./pages/Prediction";
 import History from "./pages/History";
 import Register from "./pages/Register";
-import ProtectedRoute from "./components/ProtectedRoute";
-
-
 import Login from "./pages/Login";
-
+import AdminDashboard from "./pages/AdminDashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
-    
     <Routes>
-      
-      {/* Register page outside layout */}
+
+      {/* ===== PUBLIC ROUTES ===== */}
+      <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-       
-<Route path="/login" element={<Login />} />
-             {/* All main pages inside layout */}
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<Dashboard />} />
+
+      {/* ===== PROTECTED ROUTES ===== */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="prediction" element={<Prediction />} />
         <Route path="history" element={<History />} />
+        <Route path="admin" element={<AdminDashboard />} />
       </Route>
-<Route
-  path="/"
-  element={
-    <ProtectedRoute>
-      <Dashboard />
-    </ProtectedRoute>
-  }
-/>
 
-<Route
-  path="/predict"
-  element={
-    <ProtectedRoute>
-      <Prediction />
-    </ProtectedRoute>
-  }
-/>
     </Routes>
-    
   );
 }
 
