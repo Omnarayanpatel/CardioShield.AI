@@ -151,7 +151,8 @@ def _compute_features(data: PatientData) -> tuple[np.ndarray, dict[str, float]]:
 
 def _predict_probability(features: np.ndarray) -> float:
     features_for_model = features
-    if SCALER is not None:
+    use_scaler = bool(MODEL_METADATA.get("use_scaler_for_inference", False))
+    if use_scaler and SCALER is not None:
         try:
             features_for_model = SCALER.transform(features_for_model)
         except Exception:

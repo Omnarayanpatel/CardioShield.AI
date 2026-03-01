@@ -126,6 +126,7 @@ metadata = {
     "features": list(X.columns),
     "best_model": best_model_name,
     "calibration": "isotonic",
+    "use_scaler_for_inference": False,
 }
 with open("saved/model_metadata.json", "w", encoding="utf-8") as file:
     json.dump(metadata, file, indent=2)
