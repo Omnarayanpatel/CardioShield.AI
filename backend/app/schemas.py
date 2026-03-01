@@ -55,6 +55,7 @@ class PatientData(BaseModel):
 
 
 class PredictionResponse(BaseModel):
+    prediction_id: int
     risk_probability: float
     risk_category: str
     confidence_interval: dict[str, float]

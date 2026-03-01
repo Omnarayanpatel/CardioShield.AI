@@ -1,9 +1,13 @@
 from datetime import datetime
+import csv
+import io
+import json
 
 import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import inspect, text
+from fastapi.responses import Response
+from sqlalchemy import String, cast, inspect, or_, text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
@@ -11,7 +15,14 @@ from . import models
 from .auth import get_current_admin, get_current_user, get_db, router as auth_router
 from .database import engine
 from .model_loader import load_model_bundle
-from .schemas import FairnessReportResponse, PatientData, PredictionResponse, UserResponse, UserUpdateRequest
+from .schemas import (
+    FairnessReportResponse,
+    PatientData,
+    PredictionRecordResponse,
+    PredictionResponse,
+    UserResponse,
+    UserUpdateRequest,
+)
 
 app = FastAPI(
     title="CardioShield AI API",
@@ -95,6 +106,123 @@ def _create_audit_log(
             entity_id=entity_id,
             metadata_json=metadata_json or {},
         )
+    )
+
+
+def _format_filename(prefix: str, extension: str) -> str:
+    stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    return f"{prefix}_{stamp}.{extension}"
+
+
+def _normalize_format(fmt: str) -> str:
+    value = fmt.lower().strip()
+    if value not in {"csv", "json", "txt"}:
+        raise HTTPException(status_code=400, detail="Format must be csv, json, or txt")
+    return value
+
+
+def _rows_to_csv(rows: list[dict]) -> str:
+    if not rows:
+        return ""
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue()
+
+
+def _export_response(*, fmt: str, data: list[dict] | dict, prefix: str) -> Response:
+    rows = [data] if isinstance(data, dict) else data
+    if fmt == "csv":
+        content = _rows_to_csv(rows)
+        media_type = "text/csv"
+        ext = "csv"
+    elif fmt == "txt":
+        content = json.dumps(data, indent=2, default=str)
+        media_type = "text/plain"
+        ext = "txt"
+    else:
+        content = json.dumps(data, indent=2, default=str)
+        media_type = "application/json"
+        ext = "json"
+    headers = {"Content-Disposition": f'attachment; filename="{_format_filename(prefix, ext)}"'}
+    return Response(content=content, media_type=media_type, headers=headers)
+
+
+def _prediction_to_dict(row: models.Prediction) -> dict:
+    return {
+        "id": row.id,
+        "user_id": row.user_id,
+        "user_email": row.user_email,
+        "age_days": row.age,
+        "gender": row.gender,
+        "height_cm": row.height,
+        "weight_kg": row.weight,
+        "ap_hi": row.ap_hi,
+        "ap_lo": row.ap_lo,
+        "cholesterol": row.cholesterol,
+        "gluc": row.gluc,
+        "smoke": row.smoke,
+        "alco": row.alco,
+        "active": row.active,
+        "risk_probability": row.risk_probability,
+        "risk_category_code": row.risk_category,
+        "confidence_low": row.confidence_low,
+        "confidence_high": row.confidence_high,
+        "top_risk_factors": ", ".join(row.top_risk_factors or []),
+        "explanation_text": row.explanation_text,
+        "recommendation": row.recommendation,
+        "escalation_required": row.escalation_required,
+        "created_at": row.created_at,
+    }
+
+
+def _apply_prediction_search(query, q: str | None):
+    if not q or not q.strip():
+        return query
+    normalized = q.strip().lower()
+
+    # User-friendly direct category filtering.
+    if normalized in {"low", "low risk", "low-risk"}:
+        return query.filter(models.Prediction.risk_category == 0)
+    if normalized in {"moderate", "moderate risk", "medium", "medium risk"}:
+        return query.filter(models.Prediction.risk_category == 1)
+    if normalized in {"high", "high risk", "high-risk"}:
+        return query.filter(models.Prediction.risk_category == 2)
+
+    # User-friendly escalation filter.
+    if normalized in {"escalation yes", "escalate", "yes", "true"}:
+        return query.filter(models.Prediction.escalation_required.is_(True))
+    if normalized in {"escalation no", "no", "false"}:
+        return query.filter(models.Prediction.escalation_required.is_(False))
+
+    value = f"%{normalized}%"
+    return query.filter(
+        or_(
+            models.Prediction.user_email.ilike(value),
+            cast(models.Prediction.user_id, String).ilike(value),
+            cast(models.Prediction.risk_category, String).ilike(value),
+            cast(models.Prediction.risk_probability, String).ilike(value),
+            cast(models.Prediction.ap_hi, String).ilike(value),
+            cast(models.Prediction.ap_lo, String).ilike(value),
+            cast(models.Prediction.escalation_required, String).ilike(value),
+            cast(models.Prediction.top_risk_factors, String).ilike(value),
+            models.Prediction.explanation_text.ilike(value),
+            models.Prediction.recommendation.ilike(value),
+        )
+    )
+
+
+def _only_valid_predictions(query):
+    return query.filter(
+        models.Prediction.created_at.is_not(None),
+        models.Prediction.user_id.is_not(None),
+        models.Prediction.user_email.is_not(None),
+        models.Prediction.age.is_not(None),
+        models.Prediction.ap_hi.is_not(None),
+        models.Prediction.ap_lo.is_not(None),
+        models.Prediction.risk_probability.is_not(None),
+        models.Prediction.risk_category.is_not(None),
     )
 
 
@@ -279,6 +407,7 @@ def predict(
     db.commit()
 
     return PredictionResponse(
+        prediction_id=db_record.id,
         risk_probability=round(probability, 4),
         risk_category=category_label,
         confidence_interval=confidence,
@@ -291,16 +420,19 @@ def predict(
     )
 
 
-@app.get("/history")
+@app.get("/history", response_model=list[PredictionRecordResponse])
 def history(
     db: Session = Depends(get_db),
     current_user: models.Patient = Depends(get_current_user),
+    q: str | None = Query(default=None),
     patient_id: int | None = Query(default=None),
     risk_category: int | None = Query(default=None, ge=0, le=2),
+    escalation_required: bool | None = Query(default=None),
+    min_probability: float | None = Query(default=None, ge=0, le=1),
     start_date: datetime | None = Query(default=None),
     end_date: datetime | None = Query(default=None),
 ):
-    query = db.query(models.Prediction)
+    query = _only_valid_predictions(db.query(models.Prediction))
 
     if current_user.role != "doctor":
         query = query.filter(models.Prediction.user_id == current_user.id)
@@ -309,12 +441,69 @@ def history(
 
     if risk_category is not None:
         query = query.filter(models.Prediction.risk_category == risk_category)
+    if escalation_required is not None:
+        query = query.filter(models.Prediction.escalation_required == escalation_required)
+    if min_probability is not None:
+        query = query.filter(models.Prediction.risk_probability >= min_probability)
     if start_date is not None:
         query = query.filter(models.Prediction.created_at >= start_date)
     if end_date is not None:
         query = query.filter(models.Prediction.created_at <= end_date)
+    query = _apply_prediction_search(query, q)
 
-    return query.order_by(models.Prediction.created_at.desc()).all()
+    rows = query.order_by(models.Prediction.created_at.desc()).all()
+    return [PredictionRecordResponse.model_validate(row) for row in rows]
+
+
+@app.get("/history/export")
+def history_export(
+    fmt: str = Query(default="csv", alias="format"),
+    db: Session = Depends(get_db),
+    current_user: models.Patient = Depends(get_current_user),
+    q: str | None = Query(default=None),
+    patient_id: int | None = Query(default=None),
+    risk_category: int | None = Query(default=None, ge=0, le=2),
+    escalation_required: bool | None = Query(default=None),
+    min_probability: float | None = Query(default=None, ge=0, le=1),
+    start_date: datetime | None = Query(default=None),
+    end_date: datetime | None = Query(default=None),
+):
+    fmt = _normalize_format(fmt)
+    query = _only_valid_predictions(db.query(models.Prediction))
+    if current_user.role != "doctor":
+        query = query.filter(models.Prediction.user_id == current_user.id)
+    elif patient_id is not None:
+        query = query.filter(models.Prediction.user_id == patient_id)
+    if risk_category is not None:
+        query = query.filter(models.Prediction.risk_category == risk_category)
+    if escalation_required is not None:
+        query = query.filter(models.Prediction.escalation_required == escalation_required)
+    if min_probability is not None:
+        query = query.filter(models.Prediction.risk_probability >= min_probability)
+    if start_date is not None:
+        query = query.filter(models.Prediction.created_at >= start_date)
+    if end_date is not None:
+        query = query.filter(models.Prediction.created_at <= end_date)
+    query = _apply_prediction_search(query, q)
+    rows = query.order_by(models.Prediction.created_at.desc()).all()
+    data = [_prediction_to_dict(row) for row in rows]
+    return _export_response(fmt=fmt, data=data, prefix="history")
+
+
+@app.get("/predictions/{prediction_id}/export")
+def prediction_export(
+    prediction_id: int,
+    fmt: str = Query(default="csv", alias="format"),
+    db: Session = Depends(get_db),
+    current_user: models.Patient = Depends(get_current_user),
+):
+    fmt = _normalize_format(fmt)
+    row = db.query(models.Prediction).filter(models.Prediction.id == prediction_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+    if current_user.role != "doctor" and row.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return _export_response(fmt=fmt, data=_prediction_to_dict(row), prefix=f"prediction_{prediction_id}")
 
 
 @app.get("/admin/users", response_model=list[UserResponse])
@@ -329,6 +518,36 @@ def get_users(db: Session = Depends(get_db), admin: models.Patient = Depends(get
     )
     db.commit()
     return users
+
+
+@app.get("/admin/users/export")
+def export_users(
+    fmt: str = Query(default="csv", alias="format"),
+    db: Session = Depends(get_db),
+    admin: models.Patient = Depends(get_current_admin),
+):
+    fmt = _normalize_format(fmt)
+    users = db.query(models.Patient).order_by(models.Patient.created_at.desc()).all()
+    data = [
+        {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+            "created_at": user.created_at,
+        }
+        for user in users
+    ]
+    _create_audit_log(
+        db,
+        actor_id=admin.id,
+        action="admin.users.export",
+        entity_type="patient",
+        metadata_json={"count": len(data), "format": fmt},
+    )
+    db.commit()
+    return _export_response(fmt=fmt, data=data, prefix="users")
 
 
 @app.patch("/admin/users/{user_id}", response_model=UserResponse)
@@ -362,24 +581,35 @@ def admin_update_user(
     return user
 
 
-@app.get("/admin/predictions")
+@app.get("/admin/predictions", response_model=list[PredictionRecordResponse])
 def admin_predictions(
     db: Session = Depends(get_db),
     admin: models.Patient = Depends(get_current_admin),
+    q: str | None = Query(default=None),
     patient_id: int | None = Query(default=None),
+    user_email: str | None = Query(default=None),
     risk_category: int | None = Query(default=None, ge=0, le=2),
+    escalation_required: bool | None = Query(default=None),
+    min_probability: float | None = Query(default=None, ge=0, le=1),
     start_date: datetime | None = Query(default=None),
     end_date: datetime | None = Query(default=None),
 ):
-    query = db.query(models.Prediction)
+    query = _only_valid_predictions(db.query(models.Prediction))
     if patient_id is not None:
         query = query.filter(models.Prediction.user_id == patient_id)
+    if user_email:
+        query = query.filter(models.Prediction.user_email.contains(user_email.strip()))
     if risk_category is not None:
         query = query.filter(models.Prediction.risk_category == risk_category)
+    if escalation_required is not None:
+        query = query.filter(models.Prediction.escalation_required == escalation_required)
+    if min_probability is not None:
+        query = query.filter(models.Prediction.risk_probability >= min_probability)
     if start_date is not None:
         query = query.filter(models.Prediction.created_at >= start_date)
     if end_date is not None:
         query = query.filter(models.Prediction.created_at <= end_date)
+    query = _apply_prediction_search(query, q)
 
     rows = query.order_by(models.Prediction.created_at.desc()).all()
     _create_audit_log(
@@ -390,7 +620,51 @@ def admin_predictions(
         metadata_json={"count": len(rows)},
     )
     db.commit()
-    return rows
+    return [PredictionRecordResponse.model_validate(row) for row in rows]
+
+
+@app.get("/admin/predictions/export")
+def export_admin_predictions(
+    fmt: str = Query(default="csv", alias="format"),
+    db: Session = Depends(get_db),
+    admin: models.Patient = Depends(get_current_admin),
+    q: str | None = Query(default=None),
+    patient_id: int | None = Query(default=None),
+    user_email: str | None = Query(default=None),
+    risk_category: int | None = Query(default=None, ge=0, le=2),
+    escalation_required: bool | None = Query(default=None),
+    min_probability: float | None = Query(default=None, ge=0, le=1),
+    start_date: datetime | None = Query(default=None),
+    end_date: datetime | None = Query(default=None),
+):
+    fmt = _normalize_format(fmt)
+    query = _only_valid_predictions(db.query(models.Prediction))
+    if patient_id is not None:
+        query = query.filter(models.Prediction.user_id == patient_id)
+    if user_email:
+        query = query.filter(models.Prediction.user_email.contains(user_email.strip()))
+    if risk_category is not None:
+        query = query.filter(models.Prediction.risk_category == risk_category)
+    if escalation_required is not None:
+        query = query.filter(models.Prediction.escalation_required == escalation_required)
+    if min_probability is not None:
+        query = query.filter(models.Prediction.risk_probability >= min_probability)
+    if start_date is not None:
+        query = query.filter(models.Prediction.created_at >= start_date)
+    if end_date is not None:
+        query = query.filter(models.Prediction.created_at <= end_date)
+    query = _apply_prediction_search(query, q)
+    rows = query.order_by(models.Prediction.created_at.desc()).all()
+    data = [_prediction_to_dict(row) for row in rows]
+    _create_audit_log(
+        db,
+        actor_id=admin.id,
+        action="admin.predictions.export",
+        entity_type="prediction",
+        metadata_json={"count": len(data), "format": fmt},
+    )
+    db.commit()
+    return _export_response(fmt=fmt, data=data, prefix="predictions")
 
 
 @app.get("/admin/fairness/report", response_model=FairnessReportResponse)
@@ -438,3 +712,31 @@ def latest_fairness_report(db: Session = Depends(get_db), admin: models.Patient 
         metrics=latest_report.metrics,
         created_at=latest_report.created_at,
     )
+
+
+@app.get("/admin/fairness/report/export")
+def export_fairness_report(
+    fmt: str = Query(default="json", alias="format"),
+    db: Session = Depends(get_db),
+    admin: models.Patient = Depends(get_current_admin),
+):
+    fmt = _normalize_format(fmt)
+    report = db.query(models.FairnessReport).order_by(models.FairnessReport.created_at.desc()).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="No fairness report available")
+    payload = {
+        "id": report.id,
+        "model_version": report.model_version,
+        "metrics": report.metrics,
+        "created_at": report.created_at,
+    }
+    _create_audit_log(
+        db,
+        actor_id=admin.id,
+        action="admin.fairness.export",
+        entity_type="fairness_report",
+        entity_id=str(report.id),
+        metadata_json={"format": fmt},
+    )
+    db.commit()
+    return _export_response(fmt=fmt, data=payload, prefix="fairness_report")

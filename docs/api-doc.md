@@ -83,11 +83,22 @@ Response:
 ### `GET /history`
 - Patient: own predictions.
 - Admin: supports filters `patient_id`, `risk_category`, `start_date`, `end_date`.
+- Additional filters: `escalation_required`, `min_probability`.
+- Main text search: `q`
+
+### `GET /history/export?format=csv|json|txt`
+Exports scoped history in downloadable format.
+
+### `GET /predictions/{prediction_id}/export?format=csv|json|txt`
+Exports a single prediction report.
 
 ## Admin
 
 ### `GET /admin/users`
 Admin only. Returns all users.
+
+### `GET /admin/users/export?format=csv|json|txt`
+Exports user table.
 
 ### `PATCH /admin/users/{user_id}`
 Admin only.
@@ -100,9 +111,17 @@ Admin only.
 
 ### `GET /admin/predictions`
 Admin only. Supports same filters as `/history`.
+- Additional filters: `user_email`.
+- Main text search: `q`
+
+### `GET /admin/predictions/export?format=csv|json|txt`
+Exports prediction table.
 
 ### `GET /admin/fairness/report`
 Admin only. Returns latest fairness snapshot.
+
+### `GET /admin/fairness/report/export?format=csv|json|txt`
+Exports latest fairness report.
 
 ## Health
 

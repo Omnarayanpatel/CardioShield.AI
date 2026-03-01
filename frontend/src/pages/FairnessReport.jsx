@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 
-import api from "../api";
+import api, { downloadFromApi } from "../api";
 
 function FairnessReport() {
   const [report, setReport] = useState(null);
+  const [downloadFormat, setDownloadFormat] = useState("json");
 
   useEffect(() => {
     api.get("/admin/fairness/report").then((res) => setReport(res.data));
@@ -16,8 +17,32 @@ function FairnessReport() {
   const metrics = report.metrics || {};
   return (
     <div className="rounded-2xl bg-white p-6 shadow">
-      <h2 className="text-2xl font-semibold text-slate-900">Fairness Report</h2>
-      <p className="text-sm text-slate-500 mb-4">Model version: {report.model_version}</p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900">Fairness Report</h2>
+          <p className="text-sm text-slate-500">Model version: {report.model_version}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            className="input max-w-[120px]"
+            value={downloadFormat}
+            onChange={(event) => setDownloadFormat(event.target.value)}
+          >
+            <option value="json">JSON</option>
+            <option value="csv">CSV</option>
+            <option value="txt">TXT</option>
+          </select>
+          <button
+            type="button"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+            onClick={() =>
+              downloadFromApi(`/admin/fairness/report/export?format=${downloadFormat}`, `fairness_report.${downloadFormat}`)
+            }
+          >
+            Download
+          </button>
+        </div>
+      </div>
       <div className="grid gap-4 md:grid-cols-3">
         {Object.entries(metrics)
           .filter(([key]) => key !== "note")

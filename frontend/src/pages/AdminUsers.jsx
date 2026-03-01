@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 
-import api from "../api";
+import api, { downloadFromApi } from "../api";
 
 function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState("csv");
 
   const loadUsers = () => {
     api.get("/admin/users").then((res) => setUsers(res.data));
@@ -26,7 +27,27 @@ function AdminUsers() {
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow">
-      <h2 className="text-2xl font-semibold text-slate-900 mb-4">User Management</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold text-slate-900">User Management</h2>
+        <div className="flex items-center gap-2">
+          <select
+            className="input max-w-[120px]"
+            value={downloadFormat}
+            onChange={(event) => setDownloadFormat(event.target.value)}
+          >
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+            <option value="txt">TXT</option>
+          </select>
+          <button
+            type="button"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+            onClick={() => downloadFromApi(`/admin/users/export?format=${downloadFormat}`, `users.${downloadFormat}`)}
+          >
+            Download
+          </button>
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import api from "../api";
+import api, { downloadFromApi } from "../api";
 
 const initialForm = {
   dob: "",
@@ -21,6 +21,7 @@ function Prediction() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState("csv");
 
   const handleChange = (event) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
@@ -70,9 +71,11 @@ function Prediction() {
   };
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow">
-      <h2 className="text-2xl font-semibold text-slate-900 mb-2">New Risk Prediction</h2>
-      <p className="text-sm text-slate-500 mb-6">Enter low-cost clinical inputs for 5-10 year risk estimation.</p>
+    <div className="panel">
+      <div className="mb-6 border-b border-slate-200 pb-4">
+        <h2 className="text-2xl font-semibold text-slate-900 mb-1">New Risk Prediction</h2>
+        <p className="text-sm text-slate-500">Enter low-cost clinical inputs for 5-10 year risk estimation.</p>
+      </div>
 
       {error ? <p className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
 
@@ -124,15 +127,15 @@ function Prediction() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-cyan-600 px-4 py-3 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
+          className="btn-primary"
         >
           {loading ? "Running..." : "Predict"}
         </button>
       </form>
 
       {result ? (
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-          <h3 className="text-lg font-semibold text-slate-900">Prediction Result</h3>
+        <div className="mt-6 rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50 to-white p-5">
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Prediction Result</h3>
           <p className="mt-2 text-sm text-slate-700">
             Risk: <span className="font-semibold">{result.risk_category}</span> (
             {(result.risk_probability * 100).toFixed(2)}%)
@@ -147,6 +150,29 @@ function Prediction() {
           <p className="mt-2 text-sm text-slate-700">{result.explanation_text}</p>
           <p className="mt-2 text-sm text-slate-700">{result.recommendation}</p>
           <p className="mt-2 text-xs text-slate-500">{result.disclaimer}</p>
+          <div className="mt-4 flex items-center gap-3">
+            <select
+              className="input max-w-[130px]"
+              value={downloadFormat}
+              onChange={(event) => setDownloadFormat(event.target.value)}
+            >
+              <option value="csv">CSV</option>
+              <option value="json">JSON</option>
+              <option value="txt">TXT</option>
+            </select>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() =>
+                downloadFromApi(
+                  `/predictions/${result.prediction_id}/export?format=${downloadFormat}`,
+                  `prediction_report.${downloadFormat}`
+                )
+              }
+            >
+              Download Report
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
