@@ -31,6 +31,7 @@ df["bmi"] = df["weight"] / ((df["height"] / 100) ** 2)
 df["pulse_pressure"] = df["ap_hi"] - df["ap_lo"]
 df["age_bp_interaction"] = df["age"] * df["ap_hi"]
 df["glucose_bmi_interaction"] = df["gluc"] * df["bmi"]
+df["bmi_risk_category"] = np.where(df["bmi"] < 25, 0, np.where(df["bmi"] < 30, 1, 2))
 
 # ==============================
 # 4️⃣ SPLIT (SAME RANDOM STATE)

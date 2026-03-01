@@ -3,6 +3,7 @@ import numpy as np
 import joblib
 import shap
 import os
+import json
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -41,6 +42,7 @@ df["age_bp_interaction"] = df["age"] * df["ap_hi"]
 
 # Glucose × BMI interaction
 df["glucose_bmi_interaction"] = df["gluc"] * df["bmi"]
+df["bmi_risk_category"] = np.where(df["bmi"] < 25, 0, np.where(df["bmi"] < 30, 1, 2))
 
 # ---------------------------
 # 3️⃣ SPLIT
@@ -119,6 +121,14 @@ os.makedirs("saved", exist_ok=True)
 
 joblib.dump(calibrated_model, "saved/cardio_model.pkl")
 joblib.dump(scaler, "saved/scaler.pkl")
+metadata = {
+    "version": "v1",
+    "features": list(X.columns),
+    "best_model": best_model_name,
+    "calibration": "isotonic",
+}
+with open("saved/model_metadata.json", "w", encoding="utf-8") as file:
+    json.dump(metadata, file, indent=2)
 
 print("Model & Scaler saved successfully!")
 # ---------------------------

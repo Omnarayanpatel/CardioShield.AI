@@ -1,160 +1,154 @@
 import { useState } from "react";
-import axios from "axios";
+
+import api from "../api";
+
+const initialForm = {
+  dob: "",
+  gender: "",
+  height: "",
+  weight: "",
+  ap_hi: "",
+  ap_lo: "",
+  cholesterol: "",
+  gluc: "",
+  smoke: "",
+  alco: "",
+  active: "",
+};
 
 function Prediction() {
-  const [formData, setFormData] = useState({
-    age: "",
-    gender: "",
-    height: "",
-    weight: "",
-    ap_hi: "",
-    ap_lo: "",
-    cholesterol: "",
-    gluc: "",
-    smoke: "",
-    alco: "",
-    active: "",
-  });
-
+  const [form, setForm] = useState(initialForm);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleChange = (event) => {
+    setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      // ✅ Convert all values to numbers before sending
-      const response = await axios.post(
-        "http://127.0.0.1:8000/predict",
-        {
-          age: Number(formData.age),
-          gender: Number(formData.gender),
-          height: Number(formData.height),
-          weight: Number(formData.weight),
-          ap_hi: Number(formData.ap_hi),
-          ap_lo: Number(formData.ap_lo),
-          cholesterol: Number(formData.cholesterol),
-          gluc: Number(formData.gluc),
-          smoke: Number(formData.smoke),
-          alco: Number(formData.alco),
-          active: Number(formData.active),
-        }
-      );
+      const dobDate = new Date(form.dob);
+      if (Number.isNaN(dobDate.getTime())) {
+        setError("Please select a valid date of birth.");
+        setLoading(false);
+        return;
+      }
 
-      setResult(response.data);
-      console.log(response.data);
+      const now = new Date();
+      const ageMs = now.getTime() - dobDate.getTime();
+      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      if (ageDays < 0 || ageDays > 130 * 365) {
+        setError("Please enter a valid date of birth.");
+        setLoading(false);
+        return;
+      }
 
-    } catch (error) {
-      console.error(error);
-      alert("Error connecting to backend");
+      const payload = {
+        age: ageDays,
+        gender: Number(form.gender),
+        height: Number(form.height),
+        weight: Number(form.weight),
+        ap_hi: Number(form.ap_hi),
+        ap_lo: Number(form.ap_lo),
+        cholesterol: Number(form.cholesterol),
+        gluc: Number(form.gluc),
+        smoke: Number(form.smoke),
+        alco: Number(form.alco),
+        active: Number(form.active),
+      };
+      const { data } = await api.post("/predict", payload);
+      setResult(data);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Prediction failed.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-md">
-      <h2 className="text-2xl font-bold mb-6">New Heart Risk Prediction</h2>
+    <div className="rounded-2xl bg-white p-6 shadow">
+      <h2 className="text-2xl font-semibold text-slate-900 mb-2">New Risk Prediction</h2>
+      <p className="text-sm text-slate-500 mb-6">Enter low-cost clinical inputs for 5-10 year risk estimation.</p>
 
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-2 gap-6">
+      {error ? <p className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
 
-          <input name="age" placeholder="Age (in days)" onChange={handleChange} className="input" />
-          <input name="height" placeholder="Height (cm)" onChange={handleChange} className="input" />
-          <input name="weight" placeholder="Weight (kg)" onChange={handleChange} className="input" />
-          <input name="ap_hi" placeholder="Systolic BP" onChange={handleChange} className="input" />
-          <input name="ap_lo" placeholder="Diastolic BP" onChange={handleChange} className="input" />
-
-          <select name="gender" onChange={handleChange} className="input">
-            <option value="">Select Gender</option>
-            <option value="1">Female</option>
-            <option value="2">Male</option>
-          </select>
-
-          <select name="cholesterol" onChange={handleChange} className="input">
-            <option value="">Cholesterol</option>
-            <option value="1">Normal</option>
-            <option value="2">Above Normal</option>
-            <option value="3">Well Above Normal</option>
-          </select>
-
-          <select name="gluc" onChange={handleChange} className="input">
-            <option value="">Glucose</option>
-            <option value="1">Normal</option>
-            <option value="2">Above Normal</option>
-            <option value="3">Well Above Normal</option>
-          </select>
-
-          <select name="smoke" onChange={handleChange} className="input">
-            <option value="">Smoking</option>
-            <option value="0">No</option>
-            <option value="1">Yes</option>
-          </select>
-
-          <select name="alco" onChange={handleChange} className="input">
-            <option value="">Alcohol</option>
-            <option value="0">No</option>
-            <option value="1">Yes</option>
-          </select>
-
-          <select name="active" onChange={handleChange} className="input">
-            <option value="">Physical Activity</option>
-            <option value="0">No</option>
-            <option value="1">Yes</option>
-          </select>
-
-          <button
-            type="submit"
-            className="col-span-2 bg-blue-600 text-white py-3 rounded-lg"
-          >
-            Predict Risk
-          </button>
-        </div>
-
-     {result && (
-  <div
-    className={`mt-8 p-8 rounded-2xl shadow-xl text-white transition-all duration-500
-    ${
-      result.risk_category === "Low"
-        ? "bg-gradient-to-r from-green-500 to-emerald-600"
-        : result.risk_category === "Moderate"
-        ? "bg-gradient-to-r from-yellow-500 to-orange-500"
-        : "bg-gradient-to-r from-red-500 to-rose-600"
-    }`}
-  >
-    <h2 className="text-2xl font-bold mb-4">Prediction Result</h2>
-
-    <div className="space-y-3 text-lg">
-      <p>
-        Risk Category:
-        <span className="ml-2 font-semibold">
-          {result.risk_category}
-        </span>
-      </p>
-
-      <p>
-        Risk Probability:
-        <span className="ml-2 font-semibold">
-          {(result.risk_probability * 100).toFixed(2)}%
-        </span>
-      </p>
-
-      <p>
-        Cardio Status:
-        <span className="ml-2 font-semibold">
-          {result.cardio === 1
-            ? "⚠ Disease Detected"
-            : "✅ No Disease"}
-        </span>
-      </p>
-    </div>
-  </div>
-)}
+      <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+        <input
+          className="input"
+          name="dob"
+          type="date"
+          value={form.dob}
+          onChange={handleChange}
+          required
+        />
+        <select className="input" name="gender" onChange={handleChange} required>
+          <option value="">Gender</option>
+          <option value="1">Female</option>
+          <option value="2">Male</option>
+        </select>
+        <input className="input" name="height" placeholder="Height (cm)" onChange={handleChange} required />
+        <input className="input" name="weight" placeholder="Weight (kg)" onChange={handleChange} required />
+        <input className="input" name="ap_hi" placeholder="Systolic BP" onChange={handleChange} required />
+        <input className="input" name="ap_lo" placeholder="Diastolic BP" onChange={handleChange} required />
+        <select className="input" name="cholesterol" onChange={handleChange} required>
+          <option value="">Cholesterol</option>
+          <option value="1">Normal</option>
+          <option value="2">Above normal</option>
+          <option value="3">Well above normal</option>
+        </select>
+        <select className="input" name="gluc" onChange={handleChange} required>
+          <option value="">Glucose</option>
+          <option value="1">Normal</option>
+          <option value="2">Above normal</option>
+          <option value="3">Well above normal</option>
+        </select>
+        <select className="input" name="smoke" onChange={handleChange} required>
+          <option value="">Smoking</option>
+          <option value="0">No</option>
+          <option value="1">Yes</option>
+        </select>
+        <select className="input" name="alco" onChange={handleChange} required>
+          <option value="">Alcohol intake</option>
+          <option value="0">No</option>
+          <option value="1">Yes</option>
+        </select>
+        <select className="input" name="active" onChange={handleChange} required>
+          <option value="">Physically active</option>
+          <option value="0">No</option>
+          <option value="1">Yes</option>
+        </select>
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded-lg bg-cyan-600 px-4 py-3 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
+        >
+          {loading ? "Running..." : "Predict"}
+        </button>
       </form>
+
+      {result ? (
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <h3 className="text-lg font-semibold text-slate-900">Prediction Result</h3>
+          <p className="mt-2 text-sm text-slate-700">
+            Risk: <span className="font-semibold">{result.risk_category}</span> (
+            {(result.risk_probability * 100).toFixed(2)}%)
+          </p>
+          <p className="text-sm text-slate-700">
+            Confidence interval: {(result.confidence_interval.low * 100).toFixed(1)}% -{" "}
+            {(result.confidence_interval.high * 100).toFixed(1)}%
+          </p>
+          <p className="mt-2 text-sm text-slate-700">
+            Top factors: <span className="font-medium">{result.top_risk_factors.join(", ") || "None"}</span>
+          </p>
+          <p className="mt-2 text-sm text-slate-700">{result.explanation_text}</p>
+          <p className="mt-2 text-sm text-slate-700">{result.recommendation}</p>
+          <p className="mt-2 text-xs text-slate-500">{result.disclaimer}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

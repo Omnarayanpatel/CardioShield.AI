@@ -1,95 +1,103 @@
 import { useState } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+
+import api from "../api";
 
 function Register() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
+  const [form, setForm] = useState({
+    name: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    role: "patient",
   });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const handleChange = (event) => {
+    setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-console.log("Clicked");
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
-
+    setLoading(true);
     try {
-      console.log("Sending request...");
-      const res = await axios.post("http://127.0.0.1:8000/register", {
-        name: formData.first_name + " " + formData.last_name,
-        email: formData.email,
-        password: formData.password
+      await api.post("/auth/register", {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: form.role,
       });
-
-        console.log("API Success :", response.data);
-      navigate("/", { replace: true });
-
-    } catch (error) {
-      console.log("FULL ERROR:", error);
-  console.log("RESPONSE DATA:", error.response);
-  console.log("Response data:", error.response?.data);
-  alert(JSON.stringify(error.response?.data));
+      navigate("/login", { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.detail || "Registration failed.");
+    } finally {
+      setLoading(false);
     }
   };
 
-
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-900">
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-xl">
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h1>
+        <p className="text-sm text-slate-500 mb-6">Register to start cardiovascular risk screening.</p>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-xl shadow-lg w-96"
-      >
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          Patient Registration
-        </h2>
+        {error ? <p className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
 
-        <input name="first_name" placeholder="First Name"
-          className="w-full mb-3 p-3 border rounded-lg"
-          onChange={handleChange} required />
-
-        <input name="last_name" placeholder="Last Name"
-          className="w-full mb-3 p-3 border rounded-lg"
-          onChange={handleChange} required />
-
-        <input type="email" name="email" placeholder="Gmail Address"
-          className="w-full mb-3 p-3 border rounded-lg"
-          onChange={handleChange} required />
-
-        {/* <input name="mobile" placeholder="Mobile Number"
-          className="w-full mb-3 p-3 border rounded-lg"
-          onChange={handleChange} required /> */}
-
-        <input type="password" name="password" placeholder="Password"
-          className="w-full mb-3 p-3 border rounded-lg"
-          onChange={handleChange} required />
-
-        <input type="password" name="confirmPassword" placeholder="Confirm Password"
-          className="w-full mb-4 p-3 border rounded-lg"
-          onChange={handleChange} required />
-
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
-        >
-          Register
-        </button>
+        <div className="grid grid-cols-1 gap-4">
+          <input className="input" name="name" placeholder="Full Name" value={form.name} onChange={handleChange} required />
+          <input
+            className="input"
+            type="email"
+            name="email"
+            placeholder="Email Address"
+            value={form.email}
+            onChange={handleChange}
+            required
+          />
+          <select className="input" name="role" value={form.role} onChange={handleChange}>
+            <option value="patient">Patient</option>
+            <option value="doctor">Doctor</option>
+          </select>
+          <input
+            className="input"
+            type="password"
+            name="password"
+            placeholder="Password (8+ chars)"
+            value={form.password}
+            onChange={handleChange}
+            required
+          />
+          <input
+            className="input"
+            type="password"
+            name="confirmPassword"
+            placeholder="Confirm Password"
+            value={form.confirmPassword}
+            onChange={handleChange}
+            required
+          />
+          <button
+            className="rounded-lg bg-cyan-600 px-4 py-3 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? "Creating..." : "Create Account"}
+          </button>
+        </div>
+        <p className="mt-5 text-center text-sm text-slate-600">
+          Already registered?{" "}
+          <Link to="/login" className="font-semibold text-cyan-700 hover:text-cyan-800">
+            Sign in
+          </Link>
+        </p>
       </form>
-
     </div>
   );
 }

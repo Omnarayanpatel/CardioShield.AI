@@ -1,108 +1,87 @@
 import { useState } from "react";
-import axios from "axios";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+
+import api, { saveAuth } from "../api";
 
 function Login() {
   const navigate = useNavigate();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-  });
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleChange = (event) => {
+    setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const formBody = new URLSearchParams();
-    formBody.append("username", formData.username);
-    formBody.append("password", formData.password);
-
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/login",
-        formBody.toString(),
-        {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        }
-      );
+      const { data } = await api.post("/auth/login", form, {
+        headers: { "Content-Type": "application/json" },
+      });
 
-      localStorage.setItem("token", response.data.access_token);
-
-      navigate("/dashboard");
-    } catch (error) {
-      alert("Login failed");
+      saveAuth({ token: data.access_token, user: data.user });
+      const redirectTo = data.user.role === "doctor" ? "/admin/dashboard" : "/patient/dashboard";
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.detail || "Login failed. Check your credentials.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
-        <h2 className="text-3xl font-bold text-center text-gray-800">
-          Welcome Back
-        </h2>
-        <form className="space-y-6" onSubmit={handleSubmit}>
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-900">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Sign In</h1>
+        <p className="text-sm text-slate-500 mb-6">Access your CardioShield workspace.</p>
+
+        {error ? <p className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="username"
-              className="text-sm font-medium text-gray-700"
-            >
-              Email Address
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
+              Email
             </label>
             <input
-              id="username"
-              name="username"
+              className="input"
+              id="email"
+              name="email"
               type="email"
-              autoComplete="email"
-              required
-              value={formData.username}
+              value={form.email}
               onChange={handleChange}
-              className="w-full px-4 py-2 mt-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="your.email@example.com"
+              placeholder="name@example.com"
+              required
             />
           </div>
-
           <div>
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
               Password
             </label>
             <input
+              className="input"
               id="password"
               name="password"
               type="password"
-              autoComplete="current-password"
-              required
-              value={formData.password}
+              value={form.password}
               onChange={handleChange}
-              className="w-full px-4 py-2 mt-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
+              required
             />
           </div>
-
-          <div>
-            <button
-              type="submit"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Sign in
-            </button>
-          </div>
+          <button
+            disabled={loading}
+            type="submit"
+            className="w-full rounded-lg bg-cyan-600 px-4 py-3 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
+          >
+            {loading ? "Signing in..." : "Sign In"}
+          </button>
         </form>
-        <p className="text-sm text-center text-gray-600">
-          Don't have an account?{" "}
-          <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
-            Register here
+        <p className="mt-5 text-center text-sm text-slate-600">
+          First time user?{" "}
+          <Link to="/register" className="font-semibold text-cyan-700 hover:text-cyan-800">
+            Create account
           </Link>
         </p>
       </div>

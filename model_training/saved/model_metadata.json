@@ -1,0 +1,23 @@
+{
+  "version": "v1",
+  "features": [
+    "age",
+    "gender",
+    "height",
+    "weight",
+    "ap_hi",
+    "ap_lo",
+    "cholesterol",
+    "gluc",
+    "smoke",
+    "alco",
+    "active",
+    "bmi",
+    "pulse_pressure",
+    "age_bp_interaction",
+    "glucose_bmi_interaction",
+    "bmi_risk_category"
+  ],
+  "best_model": "LightGBM",
+  "calibration": "isotonic"
+}

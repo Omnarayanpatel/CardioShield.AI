@@ -8,3 +8,8 @@ joblib
 psycopg2-binary
 sqlalchemy
 lightgbm
+python-dotenv
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+email-validator

@@ -1,37 +1,55 @@
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import MainLayout from "./layouts/MainLayout";
-import Dashboard from "./pages/Dashboard";
-import Prediction from "./pages/Prediction";
-import History from "./pages/History";
-import Register from "./pages/Register";
-import Login from "./pages/Login";
-import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminPredictions from "./pages/AdminPredictions";
+import AdminUsers from "./pages/AdminUsers";
+import FairnessReport from "./pages/FairnessReport";
+import History from "./pages/History";
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import PatientDashboard from "./pages/PatientDashboard";
+import Prediction from "./pages/Prediction";
+import Register from "./pages/Register";
 
 function App() {
   return (
     <Routes>
-
-      {/* ===== PUBLIC ROUTES ===== */}
+      <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* ===== PROTECTED ROUTES ===== */}
       <Route
-        path="/"
+        path="/patient"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowRoles={["patient"]}>
             <MainLayout />
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="dashboard" element={<PatientDashboard />} />
         <Route path="prediction" element={<Prediction />} />
         <Route path="history" element={<History />} />
-        <Route path="admin" element={<AdminDashboard />} />
+        <Route index element={<Navigate to="/patient/dashboard" replace />} />
       </Route>
 
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowRoles={["doctor"]}>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="predictions" element={<AdminPredictions />} />
+        <Route path="fairness" element={<FairnessReport />} />
+        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

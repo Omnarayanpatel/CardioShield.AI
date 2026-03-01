@@ -1,25 +1,41 @@
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
+import { getAuth } from "../api";
 
 function Sidebar() {
-  return (
-    <div className="w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white min-h-screen p-6 shadow-lg">
-      <h2 className="text-3xl font-bold mb-10 text-blue-400">
-        CardioShield AI
-      </h2>
+  const role = getAuth()?.user?.role;
+  const patientLinks = [
+    { to: "/patient/dashboard", label: "Dashboard" },
+    { to: "/patient/prediction", label: "New Prediction" },
+    { to: "/patient/history", label: "History" },
+  ];
+  const adminLinks = [
+    { to: "/admin/dashboard", label: "Overview" },
+    { to: "/admin/users", label: "Users" },
+    { to: "/admin/predictions", label: "Predictions" },
+    { to: "/admin/fairness", label: "Fairness" },
+  ];
+  const links = role === "doctor" ? adminLinks : patientLinks;
 
-      <nav className="flex flex-col gap-6 text-lg">
-        <Link to="/" className="hover:text-blue-400 transition">
-          Dashboard
-        </Link>
-        <Link to="/prediction" className="hover:text-blue-400 transition">
-           Prediction
-        </Link>
-        <Link to="/history" className="hover:text-blue-400 transition">
-          History
-        </Link>
-        <Link to="/admin">Admin</Link>
+  return (
+    <aside className="w-64 bg-slate-900 text-slate-100 min-h-screen p-6 shadow-lg">
+      <h2 className="text-2xl font-bold mb-2 text-cyan-300">CardioShield AI</h2>
+      <p className="text-xs uppercase tracking-wide text-slate-400 mb-8">{role ?? "patient"} workspace</p>
+      <nav className="flex flex-col gap-3 text-sm">
+        {links.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `rounded-lg px-3 py-2 transition ${
+                isActive ? "bg-cyan-500 text-slate-950 font-semibold" : "hover:bg-slate-800"
+              }`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
       </nav>
-    </div>
+    </aside>
   );
 }
 
