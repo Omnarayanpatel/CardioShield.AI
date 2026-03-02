@@ -96,6 +96,8 @@ class PredictionRecordResponse(BaseModel):
 
 
 class UserUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    email: EmailStr | None = None
     role: str | None = None
     is_active: bool | None = None
 

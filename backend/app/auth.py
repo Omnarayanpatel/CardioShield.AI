@@ -11,6 +11,17 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Keep bcrypt verify support for legacy hashes but use pbkdf2 for new hashes.
 pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
+COMMON_EMAIL_DOMAIN_TYPOS = {
+    "gmil.com",
+    "gmial.com",
+    "gmai.com",
+    "gmail.co",
+    "gmail.con",
+    "gnail.com",
+    "hotnail.com",
+    "yaho.com",
+    "outlok.com",
+}
 
 
 def get_db():
@@ -41,6 +52,15 @@ def _create_audit_log(
     )
 
 
+def _validate_email_domain(email: str):
+    domain = email.split("@")[-1].lower().strip()
+    if domain in COMMON_EMAIL_DOMAIN_TYPOS:
+        raise HTTPException(
+            status_code=422,
+            detail="Email domain looks incorrect. Please check spelling.",
+        )
+
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.Patient:
     payload = verify_token(token)
     user = db.query(models.Patient).filter(models.Patient.email == payload["sub"]).first()
@@ -60,6 +80,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     role = data.role.lower().strip()
     if role not in {"patient", "doctor"}:
         raise HTTPException(status_code=400, detail="Role must be patient or doctor")
+    _validate_email_domain(str(data.email))
 
     existing_user = db.query(models.Patient).filter(models.Patient.email == data.email).first()
     if existing_user:
@@ -157,6 +178,20 @@ def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if payload.name is not None:
+        user.name = payload.name.strip()
+    if payload.email is not None:
+        normalized_email = str(payload.email).lower().strip()
+        _validate_email_domain(normalized_email)
+        existing = (
+            db.query(models.Patient)
+            .filter(models.Patient.email == normalized_email, models.Patient.id != user_id)
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        user.email = normalized_email
+
     if payload.role is not None:
         role = payload.role.lower().strip()
         if role not in {"patient", "doctor"}:
@@ -171,7 +206,12 @@ def update_user(
         action="admin.user.update",
         entity_type="patient",
         entity_id=str(user.id),
-        metadata_json={"role": user.role, "is_active": user.is_active},
+        metadata_json={
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+        },
     )
     db.commit()
     db.refresh(user)

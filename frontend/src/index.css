@@ -32,3 +32,112 @@ body {
 .table-head {
   @apply bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
 }
+
+.ecg-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  overflow: hidden;
+}
+
+.ecg-line {
+  position: absolute;
+  left: -5%;
+  top: 18%;
+  width: 140%;
+  height: 120px;
+  stroke: #0e7490;
+  animation: ecg-move 8s linear infinite;
+}
+
+@keyframes ecg-move {
+  0% {
+    transform: translateX(-5%);
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(-28%);
+    opacity: 0.4;
+  }
+}
+
+.prediction-modal {
+  position: relative;
+  overflow: hidden;
+}
+
+.prediction-modal-ecg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+}
+
+.prediction-modal-ecg-line {
+  position: absolute;
+  left: -8%;
+  top: 12%;
+  width: 135%;
+  height: 120px;
+  stroke: #0e7490;
+  animation: ecg-move 9s linear infinite;
+}
+
+.chart-card-ecg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.12;
+}
+
+.chart-card-ecg-line {
+  position: absolute;
+  left: -10%;
+  top: 10%;
+  width: 140%;
+  height: 110px;
+  stroke: #0891b2;
+  animation: ecg-move 10s linear infinite;
+}
+
+.app-shell-with-ecg {
+  position: relative;
+  min-height: 100vh;
+}
+
+.app-shell-content {
+  position: relative;
+  z-index: 1;
+}
+
+.global-ecg-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.14;
+}
+
+.global-ecg-line {
+  position: absolute;
+  width: 140%;
+  left: -12%;
+  stroke: #0e7490;
+  filter: drop-shadow(0 0 1px rgba(14, 116, 144, 0.25));
+}
+
+.global-ecg-line-top {
+  top: 8%;
+  height: 130px;
+  animation: ecg-move 14s linear infinite;
+}
+
+.global-ecg-line-bottom {
+  bottom: 10%;
+  height: 120px;
+  animation: ecg-move 18s linear infinite reverse;
+}

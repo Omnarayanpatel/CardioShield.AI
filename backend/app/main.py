@@ -87,6 +87,17 @@ CALIBRATOR = MODEL_BUNDLE["calibrator"]
 MODEL_METADATA = MODEL_BUNDLE["metadata"]
 
 RISK_DISCLAIMER = "Risk estimation tool — not diagnostic."
+COMMON_EMAIL_DOMAIN_TYPOS = {
+    "gmil.com",
+    "gmial.com",
+    "gmai.com",
+    "gmail.co",
+    "gmail.con",
+    "gnail.com",
+    "hotnail.com",
+    "yaho.com",
+    "outlok.com",
+}
 
 
 def _create_audit_log(
@@ -107,6 +118,15 @@ def _create_audit_log(
             metadata_json=metadata_json or {},
         )
     )
+
+
+def _validate_email_domain(email: str):
+    domain = email.split("@")[-1].lower().strip()
+    if domain in COMMON_EMAIL_DOMAIN_TYPOS:
+        raise HTTPException(
+            status_code=422,
+            detail="Email domain looks incorrect. Please check spelling.",
+        )
 
 
 def _format_filename(prefix: str, extension: str) -> str:
@@ -560,6 +580,19 @@ def admin_update_user(
     user = db.query(models.Patient).filter(models.Patient.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if payload.name is not None:
+        user.name = payload.name.strip()
+    if payload.email is not None:
+        normalized_email = str(payload.email).lower().strip()
+        _validate_email_domain(normalized_email)
+        existing = (
+            db.query(models.Patient)
+            .filter(models.Patient.email == normalized_email, models.Patient.id != user_id)
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        user.email = normalized_email
     if payload.role is not None:
         role = payload.role.lower().strip()
         if role not in {"patient", "doctor"}:
@@ -574,11 +607,50 @@ def admin_update_user(
         action="admin.user.update",
         entity_type="patient",
         entity_id=str(user.id),
-        metadata_json={"role": user.role, "is_active": user.is_active},
+        metadata_json={
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+        },
     )
     db.commit()
     db.refresh(user)
     return user
+
+
+@app.delete("/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: models.Patient = Depends(get_current_admin),
+):
+    user = db.query(models.Patient).filter(models.Patient.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
+    db.query(models.Prediction).filter(models.Prediction.user_id == user.id).update(
+        {models.Prediction.user_id: None},
+        synchronize_session=False,
+    )
+    db.query(models.AuditLog).filter(models.AuditLog.actor_id == user.id).update(
+        {models.AuditLog.actor_id: None},
+        synchronize_session=False,
+    )
+
+    _create_audit_log(
+        db,
+        actor_id=admin.id,
+        action="admin.user.delete",
+        entity_type="patient",
+        entity_id=str(user.id),
+        metadata_json={"email": user.email, "role": user.role},
+    )
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted successfully", "user_id": user_id}
 
 
 @app.get("/admin/predictions", response_model=list[PredictionRecordResponse])
