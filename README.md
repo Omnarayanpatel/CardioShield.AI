@@ -3,7 +3,7 @@ AI-Powered Early Cardiovascular Risk Stratification Platform
 
 ## Team Members and Roles
 - Team Member 1: Backend and API development/ML pipeline and fairness evaluation
-- Team Member 2: Frontend and UX/Deployment and documentatio
+- Team Member 2: Frontend and UX/Deployment and documentation
 
 ## Problem Statement
 CardioShield AI provides low-cost, explainable cardiovascular risk estimation for underserved and rural populations. The system helps healthcare workers identify high-risk patients early for timely specialist referral.
