@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import BrandMark from "../components/BrandMark";
 
 function Landing() {
   return (
@@ -8,10 +9,18 @@ function Landing() {
       <header className="relative z-10 border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/80">CardioShield AI</p>
-            <p className="text-sm text-slate-300">Early Risk Stratification Platform</p>
+            <div className="flex items-center gap-3">
+              <BrandMark className="border-white/10 shadow-cyan-500/10" />
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/80">CardioShield AI</p>
+                <p className="text-sm text-slate-300">Early Risk Stratification Platform</p>
+              </div>
+            </div>
           </div>
           <div className="flex gap-2">
+            <Link to="/contact" className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:border-cyan-300 hover:text-cyan-200">
+              Contact
+            </Link>
             <Link to="/login" className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:border-cyan-300 hover:text-cyan-200">
               Sign In
             </Link>
@@ -39,6 +48,9 @@ function Landing() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/register" className="rounded-lg bg-cyan-400 px-6 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-300">
                 Start Screening
+              </Link>
+              <Link to="/contact" className="rounded-lg border border-white/20 px-6 py-3 text-sm font-semibold hover:border-cyan-300 hover:text-cyan-200">
+                Explore Contact Page
               </Link>
               <Link to="/login" className="rounded-lg border border-white/20 px-6 py-3 text-sm font-semibold hover:border-cyan-300 hover:text-cyan-200">
                 Open Dashboard

@@ -19,5 +19,6 @@
     "bmi_risk_category"
   ],
   "best_model": "LightGBM",
-  "calibration": "isotonic"
+  "calibration": "isotonic",
+  "use_scaler_for_inference": false
 }

@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { clearAuth, getAuth } from "../api";
+import BrandMark from "./BrandMark";
 
 function Navbar({ onMenuToggle = () => {} }) {
   const navigate = useNavigate();
@@ -29,8 +30,17 @@ function Navbar({ onMenuToggle = () => {} }) {
           </svg>
         </button>
         <div>
-          <h1 className="text-lg font-semibold text-slate-900 sm:text-xl md:text-2xl">CardioShield AI</h1>
-          <p className="hidden text-xs text-slate-500 sm:block md:text-sm">Early cardiovascular risk stratification</p>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <BrandMark
+              className="rounded-xl border-cyan-100 shadow-sm"
+              sizeClass="h-10 w-10 sm:h-11 sm:w-11"
+              textClass="text-xs sm:text-sm"
+            />
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900 sm:text-xl md:text-2xl">CardioShield AI</h1>
+              <p className="hidden text-xs text-slate-500 sm:block md:text-sm">Early cardiovascular risk stratification</p>
+            </div>
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">

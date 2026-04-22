@@ -141,3 +141,42 @@ body {
   height: 120px;
   animation: ecg-move 18s linear infinite reverse;
 }
+
+.contact-float {
+  animation: contact-float 5.6s ease-in-out infinite;
+}
+
+.contact-float-delay {
+  animation: contact-float 6.8s ease-in-out infinite;
+}
+
+.contact-panel-glow {
+  box-shadow: 0 24px 80px rgba(8, 145, 178, 0.15);
+}
+
+.contact-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  animation: contact-reveal 700ms ease forwards;
+}
+
+@keyframes contact-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes contact-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

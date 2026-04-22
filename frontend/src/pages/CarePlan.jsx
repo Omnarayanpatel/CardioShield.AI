@@ -85,12 +85,27 @@ function planByRisk(code) {
   };
 }
 
+function readHighRiskState(checkStorageKey, followUpKey) {
+  if (typeof window === "undefined") {
+    return { checks: {}, followUpDone: false };
+  }
+
+  try {
+    const savedChecks = window.localStorage.getItem(checkStorageKey);
+    const savedFollowUp = window.localStorage.getItem(followUpKey);
+    return {
+      checks: savedChecks ? JSON.parse(savedChecks) : {},
+      followUpDone: savedFollowUp === "done",
+    };
+  } catch {
+    return { checks: {}, followUpDone: false };
+  }
+}
+
 function CarePlan() {
   const navigate = useNavigate();
   const [records, setRecords] = useState([]);
   const [error, setError] = useState("");
-  const [dailyChecks, setDailyChecks] = useState({});
-  const [followUpDone, setFollowUpDone] = useState(false);
 
   useEffect(() => {
     api
@@ -113,36 +128,6 @@ function CarePlan() {
   const todayKey = new Date().toISOString().slice(0, 10);
   const checkStorageKey = `cardio_daily_checks_${todayKey}`;
   const followUpKey = `cardio_follow_up_${followUpDue.toISOString().slice(0, 10)}`;
-  const completedDailyChecks = Object.values(dailyChecks).filter(Boolean).length;
-  const allDailyDone = completedDailyChecks === HIGH_RISK_DAILY_TRACKING.length;
-  const followUpOverdue = !followUpDone && new Date() > followUpDue;
-
-  useEffect(() => {
-    if (!isHighRisk) return;
-    try {
-      const savedChecks = localStorage.getItem(checkStorageKey);
-      const savedFollowUp = localStorage.getItem(followUpKey);
-      setDailyChecks(savedChecks ? JSON.parse(savedChecks) : {});
-      setFollowUpDone(savedFollowUp === "done");
-    } catch {
-      setDailyChecks({});
-      setFollowUpDone(false);
-    }
-  }, [isHighRisk, checkStorageKey, followUpKey]);
-
-  useEffect(() => {
-    if (!isHighRisk) return;
-    localStorage.setItem(checkStorageKey, JSON.stringify(dailyChecks));
-  }, [isHighRisk, dailyChecks, checkStorageKey]);
-
-  useEffect(() => {
-    if (!isHighRisk) return;
-    localStorage.setItem(followUpKey, followUpDone ? "done" : "pending");
-  }, [isHighRisk, followUpDone, followUpKey]);
-
-  const toggleDailyCheck = (item) => {
-    setDailyChecks((prev) => ({ ...prev, [item]: !prev[item] }));
-  };
 
   return (
     <div className="space-y-5">
@@ -188,54 +173,12 @@ function CarePlan() {
       </section>
 
       {isHighRisk ? (
-        <section className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-rose-200 bg-white p-4 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-900">Urgent Follow-Up Reminder</h3>
-            <p className="mt-2 text-sm text-slate-700">
-              Specialist consult due by{" "}
-              <span className="font-semibold text-slate-900">{followUpDue.toLocaleDateString()}</span>
-            </p>
-            <p className={`mt-1 text-sm font-medium ${followUpOverdue ? "text-rose-700" : "text-amber-700"}`}>
-              {followUpDone ? "Marked done." : followUpOverdue ? "Overdue: please consult immediately." : "Pending follow-up."}
-            </p>
-            <button
-              type="button"
-              onClick={() => setFollowUpDone((prev) => !prev)}
-              className={`mt-3 rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                followUpDone ? "bg-slate-700 hover:bg-slate-600" : "bg-rose-600 hover:bg-rose-700"
-              }`}
-            >
-              {followUpDone ? "Mark as Pending" : "Mark Follow-Up Done"}
-            </button>
-          </div>
-
-          <div className="rounded-2xl border border-cyan-200 bg-white p-4 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-900">Mandatory Daily Tracking</h3>
-            <p className="mt-1 text-sm text-slate-600">
-              Completion:{" "}
-              <span className="font-semibold text-slate-900">
-                {completedDailyChecks}/{HIGH_RISK_DAILY_TRACKING.length}
-              </span>
-            </p>
-            <div className="mt-2 h-2.5 rounded-full bg-slate-100">
-              <div
-                className="h-2.5 rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500"
-                style={{ width: `${(completedDailyChecks / HIGH_RISK_DAILY_TRACKING.length) * 100}%` }}
-              />
-            </div>
-            <div className="mt-3 space-y-2">
-              {HIGH_RISK_DAILY_TRACKING.map((item) => (
-                <label key={item} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm">
-                  <input type="checkbox" checked={Boolean(dailyChecks[item])} onChange={() => toggleDailyCheck(item)} />
-                  <span className={`${dailyChecks[item] ? "line-through text-slate-500" : "text-slate-700"}`}>{item}</span>
-                </label>
-              ))}
-            </div>
-            {allDailyDone ? (
-              <p className="mt-3 rounded-lg bg-emerald-50 p-2 text-sm font-medium text-emerald-700">Great. All mandatory tracking items completed for today.</p>
-            ) : null}
-          </div>
-        </section>
+        <HighRiskTracker
+          key={`${checkStorageKey}:${followUpKey}`}
+          checkStorageKey={checkStorageKey}
+          followUpKey={followUpKey}
+          followUpDue={followUpDue}
+        />
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -249,6 +192,75 @@ function CarePlan() {
         <p className="mt-1 text-sm text-amber-900">{plan.warning}</p>
       </section>
     </div>
+  );
+}
+
+function HighRiskTracker({ checkStorageKey, followUpKey, followUpDue }) {
+  const initialState = readHighRiskState(checkStorageKey, followUpKey);
+  const [dailyChecks, setDailyChecks] = useState(initialState.checks);
+  const [followUpDone, setFollowUpDone] = useState(initialState.followUpDone);
+
+  const completedDailyChecks = Object.values(dailyChecks).filter(Boolean).length;
+  const allDailyDone = completedDailyChecks === HIGH_RISK_DAILY_TRACKING.length;
+  const followUpOverdue = !followUpDone && new Date() > followUpDue;
+
+  useEffect(() => {
+    window.localStorage.setItem(checkStorageKey, JSON.stringify(dailyChecks));
+  }, [dailyChecks, checkStorageKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem(followUpKey, followUpDone ? "done" : "pending");
+  }, [followUpDone, followUpKey]);
+
+  const toggleDailyCheck = (item) => {
+    setDailyChecks((prev) => ({ ...prev, [item]: !prev[item] }));
+  };
+
+  return (
+    <section className="grid gap-4 lg:grid-cols-2">
+      <div className="rounded-2xl border border-rose-200 bg-white p-4 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-900">Urgent Follow-Up Reminder</h3>
+        <p className="mt-2 text-sm text-slate-700">
+          Specialist consult due by <span className="font-semibold text-slate-900">{followUpDue.toLocaleDateString()}</span>
+        </p>
+        <p className={`mt-1 text-sm font-medium ${followUpOverdue ? "text-rose-700" : "text-amber-700"}`}>
+          {followUpDone ? "Marked done." : followUpOverdue ? "Overdue: please consult immediately." : "Pending follow-up."}
+        </p>
+        <button
+          type="button"
+          onClick={() => setFollowUpDone((prev) => !prev)}
+          className={`mt-3 rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+            followUpDone ? "bg-slate-700 hover:bg-slate-600" : "bg-rose-600 hover:bg-rose-700"
+          }`}
+        >
+          {followUpDone ? "Mark as Pending" : "Mark Follow-Up Done"}
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-cyan-200 bg-white p-4 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-900">Mandatory Daily Tracking</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Completion: <span className="font-semibold text-slate-900">{completedDailyChecks}/{HIGH_RISK_DAILY_TRACKING.length}</span>
+        </p>
+        <div className="mt-2 h-2.5 rounded-full bg-slate-100">
+          <div
+            className="h-2.5 rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500"
+            style={{ width: `${(completedDailyChecks / HIGH_RISK_DAILY_TRACKING.length) * 100}%` }}
+          />
+        </div>
+        <div className="mt-3 space-y-2">
+          {HIGH_RISK_DAILY_TRACKING.map((item) => (
+            <label key={item} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm">
+              <input type="checkbox" checked={Boolean(dailyChecks[item])} onChange={() => toggleDailyCheck(item)} />
+              <span className={`${dailyChecks[item] ? "line-through text-slate-500" : "text-slate-700"}`}>{item}</span>
+            </label>
+          ))}
+        </div>
+        {allDailyDone ? (
+          <p className="mt-3 rounded-lg bg-emerald-50 p-2 text-sm font-medium text-emerald-700">Great. All mandatory tracking items completed for today.</p>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

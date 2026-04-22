@@ -11,6 +11,7 @@ import History from "./pages/History";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import CarePlan from "./pages/CarePlan";
+import Contact from "./pages/Contact";
 import PatientDashboard from "./pages/PatientDashboard";
 import Prediction from "./pages/Prediction";
 import Register from "./pages/Register";
@@ -38,6 +39,7 @@ function App() {
       <div className="app-shell-content">
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
