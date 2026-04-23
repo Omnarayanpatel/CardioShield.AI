@@ -3,6 +3,7 @@ import csv
 import io
 import json
 import secrets
+import logging
 
 import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -35,6 +36,8 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+
+logger = logging.getLogger("cardioshield")
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,9 +88,18 @@ def _ensure_legacy_schema():
 
 _ensure_legacy_schema()
 models.Base.metadata.create_all(bind=engine)
-ensure_bootstrap_admin()
 
-MODEL_BUNDLE = load_model_bundle()
+try:
+    ensure_bootstrap_admin()
+except Exception as exc:
+    logger.warning("Bootstrap admin setup skipped: %s", exc)
+
+try:
+    MODEL_BUNDLE = load_model_bundle()
+except Exception as exc:
+    logger.exception("Model bundle failed to load: %s", exc)
+    MODEL_BUNDLE = {"model": None, "scaler": None, "calibrator": None, "metadata": {}}
+
 MODEL = MODEL_BUNDLE["model"]
 SCALER = MODEL_BUNDLE["scaler"]
 CALIBRATOR = MODEL_BUNDLE["calibrator"]
@@ -391,6 +403,8 @@ def predict(
     db: Session = Depends(get_db),
     current_user: models.Patient = Depends(get_current_user),
 ):
+    if MODEL is None:
+        raise HTTPException(status_code=503, detail="Model is not available on this deployment")
     if data.ap_hi <= data.ap_lo:
         raise HTTPException(status_code=422, detail="Systolic BP must be greater than diastolic BP")
 
