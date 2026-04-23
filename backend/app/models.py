@@ -13,11 +13,13 @@ class Patient(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column("password", String(255), nullable=False)
     role = Column(String(32), nullable=False, default="patient")
+    doctor_id = Column(Integer, ForeignKey("patients.id"), nullable=True, index=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     predictions = relationship("Prediction", back_populates="patient")
     audit_logs = relationship("AuditLog", back_populates="actor")
+    doctor = relationship("Patient", remote_side=[id], foreign_keys=[doctor_id], backref="assigned_patients")
 
 
 class Prediction(Base):

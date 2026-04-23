@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 205" width="180" height="205" fill="none">
+  <defs>
+    <linearGradient id="shieldBg" x1="90" y1="8" x2="90" y2="196" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0d2b2b"/>
+      <stop offset="100%" stop-color="#040d0d"/>
+    </linearGradient>
+    <linearGradient id="shieldStroke" x1="14" y1="8" x2="166" y2="196" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7fffd4"/>
+      <stop offset="55%" stop-color="#00e8b0"/>
+      <stop offset="100%" stop-color="#006b52"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <style>
+      .ecg { stroke-dasharray: 320; stroke-dashoffset: 320; animation: draw 1.8s ease-out 0.3s forwards, blink 3s ease-in-out 2.2s infinite; }
+      .dot { animation: breathe 2.8s ease-in-out infinite; }
+      .ring { animation: pulse 3s ease-out infinite; fill: none; stroke: rgba(127,255,212,0.18); stroke-width:1.5; }
+      .ring2 { animation-delay: 1.5s; }
+      @keyframes draw { to { stroke-dashoffset: 0; } }
+      @keyframes blink { 0%,100%{opacity:1} 48%,52%{opacity:0.3} }
+      @keyframes breathe { 0%,100%{r:5;opacity:0.85} 50%{r:7.5;opacity:1} }
+      @keyframes pulse { 0%{transform:scale(0.85);opacity:0.6} 100%{transform:scale(1.35);opacity:0} }
+    </style>
+  </defs>
+
+  <circle class="ring" cx="90" cy="102" r="88" />
+  <circle class="ring ring2" cx="90" cy="102" r="88" />
+
+  <path d="M90 8 L14 34 L14 98 C14 143 46 178 90 196 C134 178 166 143 166 98 L166 34 Z"
+    fill="url(#shieldBg)" stroke="url(#shieldStroke)" stroke-width="2.5" stroke-linejoin="round"/>
+
+  <path d="M90 22 L28 44 L28 98 C28 136 54 166 90 182 C126 166 152 136 152 98 L152 44 Z"
+    fill="none" stroke="rgba(127,255,212,0.08)" stroke-width="1"/>
+
+  <polyline class="ecg"
+    points="24,104 42,104 50,84 59,124 67,66 76,138 86,98 100,98 108,104 140,104 158,104"
+    stroke="#7fffd4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+    filter="url(#glow)"/>
+
+  <circle class="dot" cx="90" cy="50" r="5" fill="#7fffd4" filter="url(#glow)"/>
+  <circle cx="90" cy="50" r="11" fill="none" stroke="rgba(127,255,212,0.22)" stroke-width="1"/>
+</svg>

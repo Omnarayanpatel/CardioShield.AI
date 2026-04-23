@@ -9,6 +9,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     role: str = Field(default="patient")
+    invite_code: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -23,6 +24,7 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     role: str
+    doctor_id: int | None = None
     is_active: bool
     created_at: datetime | None = None
 
@@ -32,6 +34,25 @@ class RegisterResponse(BaseModel):
     user_id: int
     role: str
     account_status: str
+
+
+class DoctorPatientCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
+
+class DoctorPatientCreateResponse(BaseModel):
+    message: str
+    user: UserResponse
+    temporary_password: str | None = None
+
+
+class DoctorPatientUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    is_active: bool | None = None
 
 
 class LoginResponse(BaseModel):
@@ -99,6 +120,7 @@ class UserUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     email: EmailStr | None = None
     role: str | None = None
+    doctor_id: int | None = None
     is_active: bool | None = None
 
 

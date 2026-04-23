@@ -7,6 +7,8 @@ import AdminPredictions from "./pages/AdminPredictions";
 import AdminCareProtocols from "./pages/AdminCareProtocols";
 import AdminUsers from "./pages/AdminUsers";
 import FairnessReport from "./pages/FairnessReport";
+import DoctorDashboard from "./pages/DoctorDashboard";
+import DoctorPatients from "./pages/DoctorPatients";
 import History from "./pages/History";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -20,18 +22,28 @@ function App() {
   return (
     <div className="app-shell-with-ecg">
       <div className="global-ecg-layer" aria-hidden="true">
+        <div className="global-ecg-ambient global-ecg-ambient-left" />
+        <div className="global-ecg-ambient global-ecg-ambient-right" />
+
         <svg viewBox="0 0 1400 180" className="global-ecg-line global-ecg-line-top">
           <polyline
             fill="none"
-            strokeWidth="2.2"
-            points="0,110 95,110 130,110 160,60 195,140 225,95 280,110 420,110 455,110 485,60 520,140 550,95 605,110 745,110 780,110 810,60 845,140 875,95 930,110 1070,110 1105,110 1135,60 1170,140 1200,95 1255,110 1400,110"
+            strokeWidth="2.3"
+            points="0,110 92,110 128,110 158,62 192,140 223,96 276,110 420,110 452,110 482,62 516,140 548,96 604,110 744,110 778,110 808,62 842,140 874,96 928,110 1070,110 1104,110 1134,62 1168,140 1200,96 1254,110 1400,110"
+          />
+        </svg>
+        <svg viewBox="0 0 1400 180" className="global-ecg-line global-ecg-line-mid">
+          <polyline
+            fill="none"
+            strokeWidth="1.5"
+            points="0,88 110,88 150,88 180,54 218,128 245,82 302,88 450,88 492,88 522,54 560,128 588,82 648,88 786,88 828,88 858,54 896,128 924,82 982,88 1132,88 1172,88 1202,54 1240,128 1268,82 1324,88 1400,88"
           />
         </svg>
         <svg viewBox="0 0 1400 180" className="global-ecg-line global-ecg-line-bottom">
           <polyline
             fill="none"
             strokeWidth="2"
-            points="0,70 85,70 120,70 150,32 185,102 215,58 265,70 390,70 425,70 455,32 490,102 520,58 570,70 695,70 730,70 760,32 795,102 825,58 875,70 1000,70 1035,70 1065,32 1100,102 1130,58 1180,70 1400,70"
+            points="0,70 86,70 121,70 151,32 186,102 216,58 266,70 390,70 426,70 456,32 491,102 521,58 571,70 696,70 732,70 762,32 797,102 827,58 877,70 1002,70 1036,70 1066,32 1101,102 1131,58 1181,70 1400,70"
           />
         </svg>
       </div>
@@ -61,7 +73,7 @@ function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute allowRoles={["doctor"]}>
+              <ProtectedRoute allowRoles={["admin"]}>
                 <MainLayout />
               </ProtectedRoute>
             }
@@ -72,6 +84,21 @@ function App() {
             <Route path="care-protocols" element={<AdminCareProtocols />} />
             <Route path="fairness" element={<FairnessReport />} />
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          </Route>
+
+          <Route
+            path="/doctor"
+            element={
+              <ProtectedRoute allowRoles={["doctor"]}>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="dashboard" element={<DoctorDashboard />} />
+            <Route path="patients" element={<DoctorPatients />} />
+            <Route path="history" element={<History />} />
+            <Route path="care-protocols" element={<AdminCareProtocols />} />
+            <Route index element={<Navigate to="/doctor/dashboard" replace />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

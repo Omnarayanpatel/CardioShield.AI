@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -11,6 +13,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Keep bcrypt verify support for legacy hashes but use pbkdf2 for new hashes.
 pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
+ROLE_PATIENT = "patient"
+ROLE_DOCTOR = "doctor"
+ROLE_ADMIN = "admin"
+VALID_ROLES = {ROLE_PATIENT, ROLE_DOCTOR, ROLE_ADMIN}
+CLINICIAN_ROLES = {ROLE_DOCTOR, ROLE_ADMIN}
+DOCTOR_INVITE_CODE = os.getenv("DOCTOR_INVITE_CODE", "").strip()
+BOOTSTRAP_ADMIN_EMAIL = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
+BOOTSTRAP_ADMIN_PASSWORD = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "").strip()
+BOOTSTRAP_ADMIN_NAME = os.getenv("BOOTSTRAP_ADMIN_NAME", "System Admin").strip()
 COMMON_EMAIL_DOMAIN_TYPOS = {
     "gmil.com",
     "gmial.com",
@@ -70,17 +81,62 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 
 def get_current_admin(current_user: models.Patient = Depends(get_current_user)) -> models.Patient:
-    if current_user.role != "doctor":
+    if current_user.role != ROLE_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     return current_user
+
+
+def get_current_clinician(current_user: models.Patient = Depends(get_current_user)) -> models.Patient:
+    if current_user.role not in CLINICIAN_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return current_user
+
+
+def ensure_bootstrap_admin():
+    if not BOOTSTRAP_ADMIN_EMAIL or not BOOTSTRAP_ADMIN_PASSWORD:
+        return
+
+    db = SessionLocal()
+    try:
+        existing_admin = db.query(models.Patient).filter(models.Patient.role == ROLE_ADMIN).first()
+        if existing_admin:
+            return
+
+        user = db.query(models.Patient).filter(models.Patient.email == BOOTSTRAP_ADMIN_EMAIL).first()
+        if user:
+            user.role = ROLE_ADMIN
+            user.is_active = True
+            user.name = BOOTSTRAP_ADMIN_NAME or user.name
+            user.password_hash = pwd_context.hash(BOOTSTRAP_ADMIN_PASSWORD[:72])
+        else:
+            user = models.Patient(
+                name=BOOTSTRAP_ADMIN_NAME,
+                email=BOOTSTRAP_ADMIN_EMAIL,
+                password_hash=pwd_context.hash(BOOTSTRAP_ADMIN_PASSWORD[:72]),
+                role=ROLE_ADMIN,
+                is_active=True,
+            )
+            db.add(user)
+
+        db.commit()
+    finally:
+        db.close()
 
 
 @router.post("/register", response_model=RegisterResponse)
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     role = data.role.lower().strip()
-    if role not in {"patient", "doctor"}:
-        raise HTTPException(status_code=400, detail="Role must be patient or doctor")
+    if role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail="Role must be patient, doctor, or admin")
     _validate_email_domain(str(data.email))
+    if role == "admin":
+        raise HTTPException(status_code=403, detail="Admin accounts must be created by an existing admin")
+    if role == "doctor":
+        invite_code = (data.invite_code or "").strip()
+        if not DOCTOR_INVITE_CODE:
+            raise HTTPException(status_code=503, detail="Doctor registration is not configured yet")
+        if invite_code != DOCTOR_INVITE_CODE:
+            raise HTTPException(status_code=403, detail="Invalid doctor invite code")
 
     existing_user = db.query(models.Patient).filter(models.Patient.email == data.email).first()
     if existing_user:
@@ -194,7 +250,7 @@ def update_user(
 
     if payload.role is not None:
         role = payload.role.lower().strip()
-        if role not in {"patient", "doctor"}:
+        if role not in VALID_ROLES:
             raise HTTPException(status_code=400, detail="Invalid role")
         user.role = role
     if payload.is_active is not None:

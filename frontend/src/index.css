@@ -119,7 +119,7 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.14;
+  overflow: hidden;
 }
 
 .global-ecg-line {
@@ -127,19 +127,49 @@ body {
   width: 140%;
   left: -12%;
   stroke: #0e7490;
-  filter: drop-shadow(0 0 1px rgba(14, 116, 144, 0.25));
+  opacity: 0.16;
+  filter: drop-shadow(0 0 10px rgba(14, 116, 144, 0.12));
 }
 
 .global-ecg-line-top {
-  top: 8%;
-  height: 130px;
-  animation: ecg-move 14s linear infinite;
+  top: 7%;
+  height: 136px;
+  animation: ecg-move 18s linear infinite;
+}
+
+.global-ecg-line-mid {
+  top: 42%;
+  height: 118px;
+  opacity: 0.08;
+  animation: ecg-move 24s linear infinite reverse;
 }
 
 .global-ecg-line-bottom {
-  bottom: 10%;
-  height: 120px;
-  animation: ecg-move 18s linear infinite reverse;
+  bottom: 8%;
+  height: 126px;
+  opacity: 0.12;
+  animation: ecg-move 20s linear infinite reverse;
+}
+
+.global-ecg-ambient {
+  position: absolute;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.25;
+}
+
+.global-ecg-ambient-left {
+  left: -8rem;
+  top: 4rem;
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.32), rgba(20, 184, 166, 0));
+}
+
+.global-ecg-ambient-right {
+  right: -10rem;
+  bottom: 2rem;
+  background: radial-gradient(circle, rgba(14, 116, 144, 0.28), rgba(14, 116, 144, 0));
 }
 
 .contact-float {

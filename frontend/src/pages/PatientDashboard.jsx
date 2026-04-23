@@ -101,9 +101,10 @@ function PatientDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="rounded-3xl border border-cyan-100 bg-gradient-to-br from-white via-cyan-50/40 to-emerald-50/40 p-6 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">Patient Journey</p>
         <h2 className="text-2xl font-semibold text-slate-900">Patient Dashboard</h2>
-        <p className="mt-1 text-sm text-slate-500">Track your cardiovascular risk trends and preventive actions.</p>
+        <p className="mt-1 text-sm text-slate-500">Track your cardiovascular risk trends, results, and preventive actions.</p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
             Avg Probability: {(stats.avgProbability * 100).toFixed(1)}%
@@ -124,8 +125,8 @@ function PatientDashboard() {
         <SummaryCard title="High Risk" value={stats.high} tone="red" />
       </div>
 
-      <div className="rounded-2xl bg-white p-6 shadow">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Risk Distribution</h3>
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-semibold text-slate-800">Risk Distribution</h3>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -200,8 +201,8 @@ function PatientDashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h3 className="text-lg font-semibold text-slate-800 mb-4">Top Risk Drivers</h3>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-semibold text-slate-800">Top Risk Drivers</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topFactorsData} layout="vertical" margin={{ left: 8, right: 8 }}>
@@ -215,8 +216,8 @@ function PatientDashboard() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h3 className="text-lg font-semibold text-slate-800 mb-4">Recent Records</h3>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-semibold text-slate-800">Recent Records</h3>
           <div className="space-y-2">
             {recentRecords.map((row) => (
               <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">

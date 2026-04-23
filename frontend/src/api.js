@@ -4,25 +4,39 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000",
 });
 
+function getAuthStorage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.sessionStorage;
+  } catch {
+    return window.localStorage;
+  }
+}
+
 export function saveAuth(authPayload) {
-  localStorage.setItem("auth", JSON.stringify(authPayload));
+  const storage = getAuthStorage();
+  storage?.setItem("auth", JSON.stringify(authPayload));
 }
 
 export function getAuth() {
-  const raw = localStorage.getItem("auth");
+  const storage = getAuthStorage();
+  const raw = storage?.getItem("auth");
   if (!raw) {
     return null;
   }
   try {
     return JSON.parse(raw);
   } catch {
-    localStorage.removeItem("auth");
+    storage?.removeItem("auth");
     return null;
   }
 }
 
 export function clearAuth() {
-  localStorage.removeItem("auth");
+  const storage = getAuthStorage();
+  storage?.removeItem("auth");
 }
 
 export async function downloadFromApi(url, filename) {

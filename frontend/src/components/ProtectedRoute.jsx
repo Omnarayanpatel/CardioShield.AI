@@ -11,7 +11,7 @@ function ProtectedRoute({ children, allowRoles = [] }) {
   }
 
   if (allowRoles.length > 0 && !allowRoles.includes(role)) {
-    const target = role === "doctor" ? "/admin/dashboard" : "/patient/dashboard";
+    const target = role === "admin" ? "/admin/dashboard" : role === "doctor" ? "/doctor/dashboard" : "/patient/dashboard";
     return <Navigate to={target} replace />;
   }
 

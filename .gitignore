@@ -201,6 +201,15 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Local test artifacts
+bootstrap_check.db
+doctor_test.err
+doctor_test.out
+hospital_flow.db
+invite_check.db
+restart_check.db
+role_check.db
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

@@ -2,6 +2,7 @@ from datetime import datetime
 import csv
 import io
 import json
+import secrets
 
 import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -12,10 +13,13 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from . import models
-from .auth import get_current_admin, get_current_user, get_db, router as auth_router
+from .auth import ensure_bootstrap_admin, get_current_admin, get_current_clinician, get_current_user, get_db, pwd_context, router as auth_router
 from .database import engine
 from .model_loader import load_model_bundle
 from .schemas import (
+    DoctorPatientCreateRequest,
+    DoctorPatientCreateResponse,
+    DoctorPatientUpdateRequest,
     FairnessReportResponse,
     PatientData,
     PredictionRecordResponse,
@@ -59,6 +63,8 @@ def _ensure_legacy_schema():
                 safe_alter("ALTER TABLE patients ADD COLUMN is_active BOOLEAN DEFAULT TRUE")
             if "created_at" not in patient_columns:
                 safe_alter("ALTER TABLE patients ADD COLUMN created_at TIMESTAMP")
+            if "doctor_id" not in patient_columns:
+                safe_alter("ALTER TABLE patients ADD COLUMN doctor_id INTEGER")
         if "predictions" in inspector.get_table_names():
             prediction_columns = {column["name"] for column in inspector.get_columns("predictions")}
             json_type = "JSONB" if dialect == "postgresql" else "JSON"
@@ -79,6 +85,7 @@ def _ensure_legacy_schema():
 
 _ensure_legacy_schema()
 models.Base.metadata.create_all(bind=engine)
+ensure_bootstrap_admin()
 
 MODEL_BUNDLE = load_model_bundle()
 MODEL = MODEL_BUNDLE["model"]
@@ -243,6 +250,13 @@ def _only_valid_predictions(query):
         models.Prediction.ap_lo.is_not(None),
         models.Prediction.risk_probability.is_not(None),
         models.Prediction.risk_category.is_not(None),
+    )
+
+
+def _doctor_patient_query(db: Session, doctor_id: int):
+    return db.query(models.Patient.id).filter(
+        models.Patient.role == "patient",
+        models.Patient.doctor_id == doctor_id,
     )
 
 
@@ -454,10 +468,16 @@ def history(
 ):
     query = _only_valid_predictions(db.query(models.Prediction))
 
-    if current_user.role != "doctor":
+    if current_user.role == "doctor":
+        assigned_patients = _doctor_patient_query(db, current_user.id)
+        query = query.filter(models.Prediction.user_id.in_(assigned_patients))
+        if patient_id is not None:
+            query = query.filter(models.Prediction.user_id == patient_id)
+    elif current_user.role == "admin":
+        if patient_id is not None:
+            query = query.filter(models.Prediction.user_id == patient_id)
+    else:
         query = query.filter(models.Prediction.user_id == current_user.id)
-    elif patient_id is not None:
-        query = query.filter(models.Prediction.user_id == patient_id)
 
     if risk_category is not None:
         query = query.filter(models.Prediction.risk_category == risk_category)
@@ -490,10 +510,16 @@ def history_export(
 ):
     fmt = _normalize_format(fmt)
     query = _only_valid_predictions(db.query(models.Prediction))
-    if current_user.role != "doctor":
+    if current_user.role == "doctor":
+        assigned_patients = _doctor_patient_query(db, current_user.id)
+        query = query.filter(models.Prediction.user_id.in_(assigned_patients))
+        if patient_id is not None:
+            query = query.filter(models.Prediction.user_id == patient_id)
+    elif current_user.role == "admin":
+        if patient_id is not None:
+            query = query.filter(models.Prediction.user_id == patient_id)
+    else:
         query = query.filter(models.Prediction.user_id == current_user.id)
-    elif patient_id is not None:
-        query = query.filter(models.Prediction.user_id == patient_id)
     if risk_category is not None:
         query = query.filter(models.Prediction.risk_category == risk_category)
     if escalation_required is not None:
@@ -510,6 +536,168 @@ def history_export(
     return _export_response(fmt=fmt, data=data, prefix="history")
 
 
+@app.get("/doctor/patients", response_model=list[UserResponse])
+def doctor_patients(
+    db: Session = Depends(get_db),
+    current_user: models.Patient = Depends(get_current_user),
+):
+    if current_user.role != "doctor":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    patients = (
+        db.query(models.Patient)
+        .filter(models.Patient.role == "patient", models.Patient.doctor_id == current_user.id)
+        .order_by(models.Patient.created_at.desc())
+        .all()
+    )
+    return [UserResponse.model_validate(patient) for patient in patients]
+
+
+@app.post("/doctor/patients", response_model=DoctorPatientCreateResponse, status_code=201)
+def doctor_create_patient(
+    payload: DoctorPatientCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: models.Patient = Depends(get_current_clinician),
+):
+    if current_user.role != "doctor":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    normalized_email = str(payload.email).lower().strip()
+    _validate_email_domain(normalized_email)
+
+    existing = db.query(models.Patient).filter(models.Patient.email == normalized_email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    raw_password = (payload.password or "").strip() or secrets.token_urlsafe(10)
+    patient = models.Patient(
+        name=payload.name.strip(),
+        email=normalized_email,
+        password_hash=pwd_context.hash(raw_password[:72]),
+        role="patient",
+        doctor_id=current_user.id,
+        is_active=True,
+    )
+
+    db.add(patient)
+    db.flush()
+    _create_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="doctor.patient.create",
+        entity_type="patient",
+        entity_id=str(patient.id),
+        metadata_json={"email": patient.email, "doctor_id": current_user.id},
+    )
+    db.commit()
+    db.refresh(patient)
+
+    return DoctorPatientCreateResponse(
+        message="Patient account created successfully",
+        user=UserResponse.model_validate(patient),
+        temporary_password=None if payload.password else raw_password,
+    )
+
+
+@app.patch("/doctor/patients/{patient_id}", response_model=UserResponse)
+def doctor_update_patient(
+    patient_id: int,
+    payload: DoctorPatientUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: models.Patient = Depends(get_current_clinician),
+):
+    if current_user.role != "doctor":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    patient = (
+        db.query(models.Patient)
+        .filter(
+            models.Patient.id == patient_id,
+            models.Patient.role == "patient",
+            models.Patient.doctor_id == current_user.id,
+        )
+        .first()
+    )
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    if payload.name is not None:
+        patient.name = payload.name.strip()
+    if payload.email is not None:
+        normalized_email = str(payload.email).lower().strip()
+        _validate_email_domain(normalized_email)
+        existing = (
+            db.query(models.Patient)
+            .filter(models.Patient.email == normalized_email, models.Patient.id != patient_id)
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        patient.email = normalized_email
+    if payload.password is not None and payload.password.strip():
+        patient.password_hash = pwd_context.hash(payload.password.strip()[:72])
+    if payload.is_active is not None:
+        patient.is_active = payload.is_active
+
+    _create_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="doctor.patient.update",
+        entity_type="patient",
+        entity_id=str(patient.id),
+        metadata_json={
+            "name": patient.name,
+            "email": patient.email,
+            "doctor_id": current_user.id,
+            "is_active": patient.is_active,
+        },
+    )
+    db.commit()
+    db.refresh(patient)
+    return UserResponse.model_validate(patient)
+
+
+@app.delete("/doctor/patients/{patient_id}")
+def doctor_delete_patient(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Patient = Depends(get_current_clinician),
+):
+    if current_user.role != "doctor":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    patient = (
+        db.query(models.Patient)
+        .filter(
+            models.Patient.id == patient_id,
+            models.Patient.role == "patient",
+            models.Patient.doctor_id == current_user.id,
+        )
+        .first()
+    )
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    db.query(models.Prediction).filter(models.Prediction.user_id == patient.id).update(
+        {models.Prediction.user_id: None},
+        synchronize_session=False,
+    )
+    db.query(models.AuditLog).filter(models.AuditLog.actor_id == patient.id).update(
+        {models.AuditLog.actor_id: None},
+        synchronize_session=False,
+    )
+    _create_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="doctor.patient.delete",
+        entity_type="patient",
+        entity_id=str(patient.id),
+        metadata_json={"email": patient.email, "doctor_id": current_user.id},
+    )
+    db.delete(patient)
+    db.commit()
+    return {"message": "Patient deleted successfully", "patient_id": patient_id}
+
+
 @app.get("/predictions/{prediction_id}/export")
 def prediction_export(
     prediction_id: int,
@@ -521,7 +709,11 @@ def prediction_export(
     row = db.query(models.Prediction).filter(models.Prediction.id == prediction_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Prediction not found")
-    if current_user.role != "doctor" and row.user_id != current_user.id:
+    if current_user.role == "doctor":
+        assigned_patients = _doctor_patient_query(db, current_user.id)
+        if row.user_id not in {patient_id for (patient_id,) in assigned_patients.all()}:
+            raise HTTPException(status_code=403, detail="Not authorized")
+    elif current_user.role != "admin" and row.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     return _export_response(fmt=fmt, data=_prediction_to_dict(row), prefix=f"prediction_{prediction_id}")
 
@@ -595,10 +787,24 @@ def admin_update_user(
         user.email = normalized_email
     if payload.role is not None:
         role = payload.role.lower().strip()
-        if role not in {"patient", "doctor"}:
-            raise HTTPException(status_code=400, detail="Role must be patient or doctor")
+        if role not in {"patient", "doctor", "admin"}:
+            raise HTTPException(status_code=400, detail="Role must be patient, doctor, or admin")
         user.role = role
+        if role != "patient":
+            user.doctor_id = None
+    if "doctor_id" in payload.model_fields_set:
+        if payload.doctor_id is None:
+            user.doctor_id = None
+        else:
+            if user.role != "patient":
+                raise HTTPException(status_code=400, detail="Only patients can be assigned to doctors")
+            doctor = db.query(models.Patient).filter(models.Patient.id == payload.doctor_id).first()
+            if not doctor or doctor.role != "doctor":
+                raise HTTPException(status_code=400, detail="Assigned doctor must be a doctor account")
+            user.doctor_id = doctor.id
     if payload.is_active is not None:
+        if user.role == "admin" and payload.is_active is False:
+            raise HTTPException(status_code=400, detail="Admin accounts must remain active")
         user.is_active = payload.is_active
 
     _create_audit_log(
@@ -611,6 +817,7 @@ def admin_update_user(
             "name": user.name,
             "email": user.email,
             "role": user.role,
+            "doctor_id": user.doctor_id,
             "is_active": user.is_active,
         },
     )
@@ -633,6 +840,10 @@ def admin_delete_user(
 
     db.query(models.Prediction).filter(models.Prediction.user_id == user.id).update(
         {models.Prediction.user_id: None},
+        synchronize_session=False,
+    )
+    db.query(models.Patient).filter(models.Patient.doctor_id == user.id).update(
+        {models.Patient.doctor_id: None},
         synchronize_session=False,
     )
     db.query(models.AuditLog).filter(models.AuditLog.actor_id == user.id).update(

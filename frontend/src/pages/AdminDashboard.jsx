@@ -103,25 +103,25 @@ function AdminDashboard() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="overflow-hidden rounded-3xl border border-slate-800/10 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-6 text-white shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">CardioShield AI</p>
-            <h2 className="mt-1 text-3xl font-semibold text-slate-900">Admin Dashboard</h2>
-            <p className="mt-1 text-sm text-slate-600">Clinical oversight, governance, and system-wide monitoring.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">CardioShield AI</p>
+            <h2 className="mt-1 text-3xl font-semibold text-white">Admin Dashboard</h2>
+            <p className="mt-1 max-w-2xl text-sm text-slate-300">Governance, account control, fairness monitoring, and system-wide oversight.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => navigate("/admin/predictions")}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+              className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300"
             >
               Open Predictions
             </button>
             <button
               type="button"
               onClick={() => navigate("/admin/users")}
-              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
             >
               Manage Users
             </button>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import api, { downloadFromApi } from "../api";
+import api, { downloadFromApi, getAuth } from "../api";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -23,6 +23,7 @@ function categoryLabel(code) {
 }
 
 function History() {
+  const role = getAuth()?.user?.role;
   const [records, setRecords] = useState([]);
   const [error, setError] = useState("");
   const [downloadFormat, setDownloadFormat] = useState("csv");
@@ -68,8 +69,16 @@ function History() {
     <div className="rounded-2xl bg-white p-6 shadow">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-900">Prediction History</h2>
-          <p className="text-sm text-slate-500">Your past cardiovascular risk assessments.</p>
+          <h2 className="text-2xl font-semibold text-slate-900">
+            {role === "doctor" ? "Patient History" : role === "admin" ? "System History" : "Prediction History"}
+          </h2>
+          <p className="text-sm text-slate-500">
+            {role === "doctor"
+              ? "All accessible cardiovascular risk assessments."
+              : role === "admin"
+                ? "System-wide cardiovascular risk assessments."
+                : "Your past cardiovascular risk assessments."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <select className="input max-w-[120px]" value={downloadFormat} onChange={(event) => setDownloadFormat(event.target.value)}>
@@ -84,22 +93,27 @@ function History() {
       </div>
 
       <div className="mb-5">
-        <input
-          className="input"
-          name="mainFilter"
-          value={mainFilter}
-          onChange={(event) => setMainFilter(event.target.value)}
-          placeholder="Main Search: email, risk, probability, BP, factors, recommendation..."
-        />
+          <input
+            className="input"
+            name="mainFilter"
+            value={mainFilter}
+            onChange={(event) => setMainFilter(event.target.value)}
+            placeholder={
+              role === "patient"
+                ? "Main Search: risk, probability, BP, factors, recommendation..."
+                : "Main Search: email, risk, probability, BP, factors, recommendation..."
+            }
+          />
       </div>
 
       {error ? <p className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
               <th className="py-3">Date</th>
+              {role === "doctor" || role === "admin" ? <th className="py-3">Patient Email</th> : null}
               <th className="py-3">Risk</th>
               <th className="py-3">Probability</th>
               <th className="py-3">BP</th>
@@ -110,6 +124,7 @@ function History() {
             {records.map((row) => (
               <tr key={row.id} className="border-b border-slate-100">
                 <td className="py-3">{formatDate(row.created_at)}</td>
+                {role === "doctor" || role === "admin" ? <td className="py-3">{row.user_email || "-"}</td> : null}
                 <td className="py-3">{categoryLabel(row.risk_category)}</td>
                 <td className="py-3">{formatProbability(row.risk_probability)}</td>
                 <td className="py-3">

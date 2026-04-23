@@ -10,6 +10,12 @@ function Sidebar({ isOpen = false, onClose = () => {} }) {
     { to: "/patient/care-plan", label: "Care Plan" },
     { to: "/patient/history", label: "History" },
   ];
+  const doctorLinks = [
+    { to: "/doctor/dashboard", label: "Dashboard" },
+    { to: "/doctor/patients", label: "Patients" },
+    { to: "/doctor/history", label: "Patient History" },
+    { to: "/doctor/care-protocols", label: "Care Protocols" },
+  ];
   const adminLinks = [
     { to: "/admin/dashboard", label: "Overview" },
     { to: "/admin/users", label: "Users" },
@@ -17,7 +23,7 @@ function Sidebar({ isOpen = false, onClose = () => {} }) {
     { to: "/admin/care-protocols", label: "Care Protocols" },
     { to: "/admin/fairness", label: "Fairness" },
   ];
-  const links = role === "doctor" ? adminLinks : patientLinks;
+  const links = role === "admin" ? adminLinks : role === "doctor" ? doctorLinks : patientLinks;
 
   return (
     <aside

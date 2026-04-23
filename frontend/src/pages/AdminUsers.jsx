@@ -1,28 +1,53 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import api, { downloadFromApi } from "../api";
+import api, { clearAuth, downloadFromApi } from "../api";
 
 function AdminUsers() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState("csv");
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", email: "", role: "patient", is_active: true });
+  const [editForm, setEditForm] = useState({ name: "", email: "", role: "patient", doctor_id: "", is_active: true });
+  const [error, setError] = useState("");
 
-  const loadUsers = async () => {
-    const res = await api.get("/admin/users");
-    setUsers(res.data);
-  };
+  const handleAuthError = useCallback((err) => {
+    const status = err?.response?.status;
+    if (status === 401) {
+      clearAuth();
+      navigate("/login", { replace: true });
+      return "Session expired. Please login again.";
+    }
+    return err?.response?.data?.detail || "Something went wrong.";
+  }, [navigate]);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await api.get("/admin/users");
+      setUsers(res.data);
+      setError("");
+    } catch (err) {
+      setError(handleAuthError(err));
+      throw err;
+    }
+  }, [handleAuthError]);
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    loadUsers().catch(() => {});
+  }, [loadUsers]);
 
   const toggleActive = async (user) => {
+    if (user.role === "admin") {
+      setError("Admin accounts must remain active.");
+      return;
+    }
     setLoading(true);
     try {
       await api.patch(`/admin/users/${user.id}`, { is_active: !user.is_active });
-      loadUsers();
+      await loadUsers();
+    } catch (err) {
+      setError(handleAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -34,13 +59,14 @@ function AdminUsers() {
       name: user.name || "",
       email: user.email || "",
       role: user.role || "patient",
+      doctor_id: user.doctor_id || "",
       is_active: !!user.is_active,
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ name: "", email: "", role: "patient", is_active: true });
+    setEditForm({ name: "", email: "", role: "patient", doctor_id: "", is_active: true });
   };
 
   const saveEdit = async (userId) => {
@@ -50,10 +76,13 @@ function AdminUsers() {
         name: editForm.name.trim(),
         email: editForm.email.trim().toLowerCase(),
         role: editForm.role,
-        is_active: editForm.is_active,
+        doctor_id: editForm.role === "patient" ? (editForm.doctor_id ? Number(editForm.doctor_id) : null) : null,
+        is_active: editForm.role === "admin" ? true : editForm.is_active,
       });
       await loadUsers();
       cancelEdit();
+    } catch (err) {
+      setError(handleAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -69,6 +98,8 @@ function AdminUsers() {
       if (editingId === user.id) {
         cancelEdit();
       }
+    } catch (err) {
+      setError(handleAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -76,7 +107,10 @@ function AdminUsers() {
 
   const activeCount = users.filter((item) => item.is_active).length;
   const doctorCount = users.filter((item) => item.role === "doctor").length;
+  const adminCount = users.filter((item) => item.role === "admin").length;
   const patientCount = users.filter((item) => item.role === "patient").length;
+  const doctors = users.filter((item) => item.role === "doctor");
+  const doctorNameById = new Map(doctors.map((item) => [item.id, item.name]));
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -85,7 +119,7 @@ function AdminUsers() {
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">CardioShield Control</p>
             <h2 className="text-3xl font-semibold text-slate-900">User Management</h2>
-            <p className="text-sm text-slate-600">Manage doctor and patient accounts with secure role controls.</p>
+            <p className="text-sm text-slate-600">Manage admin, doctor, and patient accounts with secure role controls.</p>
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -109,18 +143,21 @@ function AdminUsers() {
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <MetricCard label="Total Users" value={users.length} />
           <MetricCard label="Active Users" value={activeCount} />
-          <MetricCard label="Doctors / Patients" value={`${doctorCount} / ${patientCount}`} />
+          <MetricCard label="Admins / Doctors / Patients" value={`${adminCount} / ${doctorCount} / ${patientCount}`} />
         </div>
       </div>
 
       <div className="p-6 pt-5">
+        {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+
         <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[920px] text-sm">
             <thead className="bg-slate-50">
               <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Assigned Doctor</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
@@ -160,14 +197,40 @@ function AdminUsers() {
                       >
                         <option value="patient">Patient</option>
                         <option value="doctor">Doctor</option>
+                        <option value="admin">Admin</option>
                       </select>
                     ) : (
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          user.role === "doctor" ? "bg-cyan-100 text-cyan-700" : "bg-violet-100 text-violet-700"
+                          user.role === "admin"
+                            ? "bg-slate-200 text-slate-800"
+                            : user.role === "doctor"
+                              ? "bg-cyan-100 text-cyan-700"
+                              : "bg-violet-100 text-violet-700"
                         }`}
                       >
-                        {user.role === "doctor" ? "Doctor" : "Patient"}
+                        {user.role === "admin" ? "Admin" : user.role === "doctor" ? "Doctor" : "Patient"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {editingId === user.id ? (
+                      <select
+                        className="input max-w-[220px] py-2"
+                        value={editForm.doctor_id}
+                        onChange={(event) => setEditForm((prev) => ({ ...prev, doctor_id: event.target.value }))}
+                        disabled={editForm.role !== "patient"}
+                      >
+                        <option value="">Unassigned</option>
+                        {doctors.map((doctor) => (
+                          <option key={doctor.id} value={doctor.id}>
+                            {doctor.name} ({doctor.email})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-slate-700">
+                        {user.role === "patient" ? doctorNameById.get(user.doctor_id) || "Unassigned" : "-"}
                       </span>
                     )}
                   </td>
@@ -179,6 +242,7 @@ function AdminUsers() {
                         onChange={(event) =>
                           setEditForm((prev) => ({ ...prev, is_active: event.target.value === "active" }))
                         }
+                        disabled={editForm.role === "admin"}
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -186,10 +250,12 @@ function AdminUsers() {
                     ) : (
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          user.is_active ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                          user.role === "admin" || user.is_active
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
                         }`}
                       >
-                        {user.is_active ? "Active" : "Inactive"}
+                        {user.role === "admin" ? "Always Active" : user.is_active ? "Active" : "Inactive"}
                       </span>
                     )}
                   </td>
@@ -230,7 +296,7 @@ function AdminUsers() {
                             onClick={() => toggleActive(user)}
                             className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
                           >
-                            {user.is_active ? "Deactivate" : "Activate"}
+                            {user.role === "admin" ? "Locked Active" : user.is_active ? "Deactivate" : "Activate"}
                           </button>
                           <button
                             type="button"
@@ -248,7 +314,7 @@ function AdminUsers() {
               ))}
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                     No users found.
                   </td>
                 </tr>
